@@ -80,16 +80,49 @@ async function runMigration() {
   console.log("🚀 Starting DB Migration v2...");
   const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
 
+  // Pre-seed Cleanup
+  console.log("🧹 Performing robust pre-seed cleanup...");
+  const childRegex = /^KBC-HCM_/;
+  const parentRegex = /^PH_KBC-HCM_/;
+  const teacherRegex = /^GV_KBC_[A-Z]+$/;
+
+  const childrenSnap = await db.collection("children").get();
+  for (const doc of childrenSnap.docs) {
+    if (childRegex.test(doc.id)) {
+      await doc.ref.delete();
+      await db.collection("hpdt_stats").doc(doc.id).delete();
+    }
+  }
+
+  const usersSnap = await db.collection("users").get();
+  for (const doc of usersSnap.docs) {
+    if (parentRegex.test(doc.id) || teacherRegex.test(doc.id)) {
+      await doc.ref.delete();
+    }
+  }
+  console.log("✅ Cleanup complete.");
+
   const allTeacherIds = Object.values(TEACHER_LINK);
   const teacherChildrenMap = {};
   allTeacherIds.forEach(id => (teacherChildrenMap[id] = []));
 
   const allChildIds = [];
+  const generatedIds = new Set();
 
   for (const student of OFFICIAL_STUDENTS) {
     const slugName = getSlug(student.name);
     const yearSuffix = student.dob.substring(2, 4); // 2020 -> 20 -> G20
-    const childId = `KBC-HCM_${slugName}-G${yearSuffix}`;
+    let childId = `KBC-HCM_${slugName}-G${yearSuffix}`;
+    
+    // Handle collisions
+    let counter = 1;
+    let baseId = childId;
+    while (generatedIds.has(childId)) {
+      childId = `${baseId}-${counter}`;
+      counter++;
+    }
+    generatedIds.add(childId);
+
     const parentId = `PH_${childId}`;
     const teacherId = TEACHER_LINK[student.teacher] || "GV_KBC_ADMIN";
 

@@ -57,13 +57,17 @@ export default function TeacherHome() {
           : query(collection(db, "children"), where("teacherId", "==", userId));
           
         const snap = await getDocs(q);
-        const list: Student[] = snap.docs.map((d) => ({
-          id: d.id,
-          name: d.data().name,
-          initial: d.data().initial || d.data().name[0],
-          status: d.data().status || "Bình thường",
-          hpdt: d.data().hpdt || 0,
-        }));
+        const list: Student[] = snap.docs.map((d) => {
+          const data = d.data();
+          if (!data) return null;
+          return {
+            id: d.id,
+            name: data.name || "Học sinh không tên",
+            initial: data.initial || (data.name ? data.name[0] : "?"),
+            status: data.status || "Bình thường",
+            hpdt: data.hpdt || 0,
+          };
+        }).filter(Boolean) as Student[];
         setStudents(list);
       } catch (e) {
         console.error("Failed to load teacher data:", e);

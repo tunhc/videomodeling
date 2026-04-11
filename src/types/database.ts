@@ -8,7 +8,7 @@ export interface VideoMetadata {
   childId: string;
   role: Role;
   primaryTag: string; // The behavioral category
-  allTags: string[]; 
+  allTags: string[];
   context: "home" | "school" | "commute" | "public";
   topic: string; // Specific activity within tag
   status: "pending" | "analyzed" | "flagged";

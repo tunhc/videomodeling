@@ -91,29 +91,21 @@ export const videoService = {
   } = {}) {
     const { role, userId, childId, limitCount = 50 } = options;
     
-    let q = query(collection(db, "video_modeling"), orderBy("createdAt", "desc"));
+    let q = query(collection(db, "video_modeling"));
 
     // Apply filtering logic based on role
     if (role === "admin") {
       // Admin sees everything
     } else if (role === "parent" && childId) {
       // Parent only sees their child's videos
-      q = query(
-        collection(db, "video_modeling"), 
-        where("childId", "==", childId),
-        orderBy("createdAt", "desc")
-      );
+      q = query(collection(db, "video_modeling"), where("childId", "==", childId));
     } else if (role === "teacher" && userId) {
       // Teacher only sees videos for children they teach
-      q = query(
-        collection(db, "video_modeling"), 
-        where("teacherId", "==", userId),
-        orderBy("createdAt", "desc")
-      );
+      q = query(collection(db, "video_modeling"), where("teacherId", "==", userId));
     }
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
+    const list = snapshot.docs.map(doc => {
       const data = doc.data() as any;
       return {
         id: doc.id,
@@ -121,6 +113,13 @@ export const videoService = {
         url: cloudinaryService.deobfuscateUrl(data.url)
       };
     });
+
+    // Sort in memory by createdAt desc (avoiding composite index requirement)
+    return list.sort((a, b) => {
+      const timeA = a.createdAt?.toMillis?.() || 0;
+      const timeB = b.createdAt?.toMillis?.() || 0;
+      return timeB - timeA;
+    }).slice(0, limitCount);
   },
 
   /**
@@ -174,10 +173,17 @@ export const videoService = {
     
     const q = query(
       collection(db, "video_modeling"), 
-      where("childId", "==", childId),
-      where("createdAt", ">=", today)
+      where("childId", "==", childId)
     );
     const snapshot = await getDocs(q);
-    return snapshot.size;
+    
+    // Filter by date in memory to avoid composite index requirement
+    const todayMillis = today.getTime();
+    const todayVideos = snapshot.docs.filter(doc => {
+      const createdAt = doc.data().createdAt;
+      return createdAt?.toMillis?.() >= todayMillis;
+    });
+    
+    return todayVideos.length;
   }
 };
