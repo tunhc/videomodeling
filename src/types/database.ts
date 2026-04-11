@@ -16,6 +16,7 @@ export interface VideoMetadata {
   expertNote?: string;
   verifiedTags: string[];
   duration?: number; // Duration in seconds
+  teacherId?: string; // Teacher assigned to this child
   createdAt: any; // Firestore Timestamp
 }
 

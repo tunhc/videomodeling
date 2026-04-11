@@ -340,7 +340,7 @@ export default function TeacherSchedule() {
         role="teacher" 
         isOpen={isUploadOpen} 
         onClose={() => setIsUploadOpen(false)} 
-        initialChildId={selectedChild?.id}
+        childId={selectedChild?.id}
         initialTopic={activeTopic}
       />
     </div>

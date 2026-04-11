@@ -28,18 +28,21 @@ export default function ParentHome() {
     const userId = localStorage.getItem("userId");
     const userRole = localStorage.getItem("userRole") as any;
 
-    if (!userId) return;
+    if (!userId) {
+      setLoadingVideos(false);
+      return;
+    }
 
     async function loadProfile() {
       try {
-        const docRef = doc(db, "users", userId);
+        const docRef = doc(db, "users", userId as string);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
           const profile = snap.data();
           setUserProfile({ id: snap.id, role: userRole, ...profile });
-        } else {
+        } else if (userId) {
           // Fallback if user doc doesn't exist yet but logged in via mock
-          setUserProfile({ id: userId, role: userRole, childId: userId.replace("PH_", "") });
+          setUserProfile({ id: userId, role: userRole, childId: (userId as string).replace("PH_", "") });
         }
       } catch (e) {
         console.error("Failed to load user profile:", e);

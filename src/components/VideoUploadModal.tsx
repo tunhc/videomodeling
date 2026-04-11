@@ -9,11 +9,11 @@ interface VideoUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   role: "parent" | "teacher";
-  initialChildId?: string | null;
+  childId?: string | null;
   initialTopic?: string;
 }
 
-export default function VideoUploadModal({ isOpen, onClose, role, initialChildId, initialTopic }: VideoUploadModalProps) {
+export default function VideoUploadModal({ isOpen, onClose, role, childId, initialTopic }: VideoUploadModalProps) {
   const router = useRouter();
   const [step, setStep] = useState<"upload" | "processing" | "labeling" | "context" | "success">("upload");
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
@@ -80,7 +80,7 @@ export default function VideoUploadModal({ isOpen, onClose, role, initialChildId
         }, 3000);
       });
 
-      const activeChildId = initialChildId || "KBC-HCM_Long_B01";
+      const activeChildId = childId || "KBC-HCM_Long_B01";
       const finalTopic = initialTopic || video.name;
 
       // 2. Upload to Cloudinary
