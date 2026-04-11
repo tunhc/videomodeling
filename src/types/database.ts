@@ -57,3 +57,34 @@ export interface HPDTStats {
   };
   lastUpdate: any;
 }
+
+export interface Child {
+  id: string; // Document ID (e.g., KBC-HCM_Long-G20)
+  name: string;
+  initial: string;
+  nickname?: string;
+  birthday?: string | any; // YYYY-MM-DD or Timestamp
+  age?: number;
+  gender?: "B" | "G";
+  status: string;
+  hpdt: number;
+  diagnosis?: string;
+  schoolCode: string;
+  teacherId: string;
+  parentId: string;
+  updatedAt: any;
+}
+
+export interface AppUser {
+  id: string; // PH_... or GV_...
+  displayName: string;
+  role: Role;
+  email?: string;
+  password?: string; // Standard/Mock password
+  childId?: string; // For parents
+  teacherId?: string; // For parents
+  childIds?: string[]; // For teachers/admins
+  centerCode?: string;
+  hpdt?: number;
+  updatedAt: any;
+}
