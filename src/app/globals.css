@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #4F46E5;
+  --color-primary-dark: #3730A3;
+  --color-secondary: #10B981;
+  --color-calming-bg: #F8FAFC;
+  --color-calming-text: #1E293B;
+  
+  --background-image-brain-gradient: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+  
+  --shadow-hpdt: 0 15px 40px -10px rgba(79, 70, 229, 0.3);
+  --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  --shadow-premium: 0 20px 50px -12px rgba(0, 0, 0, 0.08);
+
+  --font-lexend: "Lexend", sans-serif;
+}
+
+:root {
+  --background: #F8FAFC;
+  --foreground: #1E293B;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-lexend);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: rgba(79, 70, 22, 0.2);
+}
+
+/* Custom Utilities */
+@utility calm-card {
+  background-color: white;
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-soft);
+}
+
+@utility primary-btn {
+  background-color: var(--color-primary);
+  color: white;
+  font-weight: 500;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-soft);
+  
+  &:hover {
+    background-color: var(--color-primary-dark);
+    box-shadow: var(--shadow-premium);
+  }
+  
+  &:active {
+    transform: scale(0.95);
+  }
+}

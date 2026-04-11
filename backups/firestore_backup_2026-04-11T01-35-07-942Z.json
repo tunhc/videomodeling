@@ -1,0 +1,2378 @@
+{
+  "children": [
+    {
+      "id": 1,
+      "name": "Nguyễn Trường Long",
+      "nickname": "Bé Long",
+      "birthDay": "19/01/2020",
+      "gender": "B",
+      "parentId": "PH_Long_B01",
+      "teacherId": "GV_KBC_Vy01"
+    },
+    {
+      "id": 10,
+      "name": "Lại Thế Anh",
+      "nickname": "Bo (KLC)",
+      "birthDay": "7/2/2022",
+      "gender": "B",
+      "parentId": "PH_Anh_B10",
+      "teacherId": "GV_KBC_Quynh04"
+    },
+    {
+      "id": 11,
+      "name": "Lê Doãn Bảo Long",
+      "nickname": "Võ Tòng",
+      "birthDay": "18/03/2024",
+      "gender": "B",
+      "parentId": "PH_Long_B11",
+      "teacherId": "GV_KBC_Hoang05"
+    },
+    {
+      "id": 12,
+      "name": "Mai Hoàng Bảo Trân",
+      "nickname": "Sữa",
+      "birthDay": "26/01/2021",
+      "gender": "G",
+      "parentId": "PH_Tran_G12",
+      "teacherId": "GV_KBC_Hoang05"
+    },
+    {
+      "id": 13,
+      "name": "Nguyễn Tiến Phước",
+      "nickname": "Bé Phước",
+      "birthDay": "13/09/2019",
+      "gender": "B",
+      "parentId": "PH_Phuoc_B13",
+      "teacherId": "GV_KBC_Nghi06"
+    },
+    {
+      "id": 14,
+      "name": "Lương Minh Bảo",
+      "nickname": "Bòn Bon",
+      "birthDay": "25/03/2020",
+      "gender": "B",
+      "parentId": "PH_Bao_B14",
+      "teacherId": "GV_KBC_Hoa07"
+    },
+    {
+      "id": 15,
+      "name": "Phan Văn Trọng Nghĩa",
+      "nickname": "Gà",
+      "birthDay": "30/03/2024",
+      "gender": "B",
+      "parentId": "PH_Nghia_B15",
+      "teacherId": "GV_KBC_Hoa07"
+    },
+    {
+      "id": 16,
+      "name": "Vũ Đạt Phúc An",
+      "nickname": "Bé An",
+      "birthDay": "8/6/2017",
+      "gender": "G",
+      "parentId": "PH_An_G16",
+      "teacherId": "GV_KBC_Hoa07"
+    },
+    {
+      "id": 17,
+      "name": "Nguyễn Hoàng Đăng Khoa",
+      "nickname": "Lucas",
+      "birthDay": "27/04/2019",
+      "gender": "B",
+      "parentId": "PH_Khoa_B17",
+      "teacherId": "GV_KBC_Khiem08"
+    },
+    {
+      "id": 18,
+      "name": "Trần Gia Phúc",
+      "nickname": "Bo (TT)",
+      "birthDay": "5/12/2019",
+      "gender": "B",
+      "parentId": "PH_Phuc_B18",
+      "teacherId": "GV_KBC_Tuyen09"
+    },
+    {
+      "id": 19,
+      "name": "Đặng Bình Minh Anh",
+      "nickname": "Kem",
+      "birthDay": "8/4/2019",
+      "gender": "G",
+      "parentId": "PH_Anh_G19",
+      "teacherId": "GV_KBC_MaiAn10"
+    },
+    {
+      "id": 2,
+      "name": "Nguyễn Đăng Khôi",
+      "nickname": "Bé Khôi",
+      "birthDay": "26/12/2018",
+      "gender": "B",
+      "parentId": "PH_Khoi_B02",
+      "teacherId": "GV_KBC_HongNgan02"
+    },
+    {
+      "id": 20,
+      "name": "Lê Trung Khang",
+      "nickname": "Bé Khang",
+      "birthDay": "26/12/2019",
+      "gender": "B",
+      "parentId": "PH_Khang_B20",
+      "teacherId": "GV_KBC_Trang11"
+    },
+    {
+      "id": 21,
+      "name": "Nguyễn Khải Ninh",
+      "nickname": "Bon",
+      "birthDay": "12/3/2015",
+      "gender": "B",
+      "parentId": "PH_Ninh_B21",
+      "teacherId": "GV_KBC_Huyen12"
+    },
+    {
+      "id": 3,
+      "name": "Trương Thanh Phong",
+      "nickname": "Bé Phong",
+      "birthDay": "13/02/2019",
+      "gender": "B",
+      "parentId": "PH_Phong_B03",
+      "teacherId": "GV_KBC_HongNgan02"
+    },
+    {
+      "id": 4,
+      "name": "Dương Minh Khang",
+      "nickname": "Rô",
+      "birthDay": "26/01/2020",
+      "gender": "B",
+      "parentId": "PH_Khang_B04",
+      "teacherId": "GV_KBC_HongNgan02"
+    },
+    {
+      "id": 5,
+      "name": "Trương Thanh Lâm",
+      "nickname": "Bé Lâm",
+      "birthDay": "16/08/2021",
+      "gender": "B",
+      "parentId": "PH_Lam_B05",
+      "teacherId": "GV_KBC_Thao03"
+    },
+    {
+      "id": 6,
+      "name": "Nguyễn Quý Minh Đức",
+      "nickname": "Bé Đức",
+      "birthDay": "7/1/2021",
+      "gender": "B",
+      "parentId": "PH_Duc_B06",
+      "teacherId": "GV_KBC_Quynh04"
+    },
+    {
+      "id": 7,
+      "name": "Thi Phúc Khang",
+      "nickname": "Đô la",
+      "birthDay": "26/01/2019",
+      "gender": "B",
+      "parentId": "PH_Khang_B07",
+      "teacherId": "GV_KBC_Quynh04"
+    },
+    {
+      "id": 8,
+      "name": "Lê Minh Khang",
+      "nickname": "Toro",
+      "birthDay": "8/10/2023",
+      "gender": "B",
+      "parentId": "PH_Khang_B08",
+      "teacherId": "GV_KBC_Quynh04"
+    },
+    {
+      "id": 9,
+      "name": "Phạm Quang Thiên",
+      "nickname": "Bé Thiên",
+      "birthDay": "11/2/2024",
+      "gender": "B",
+      "parentId": "PH_Thien_B09",
+      "teacherId": "GV_KBC_Quynh04"
+    },
+    {
+      "id": "KBC-HCM_Bảo_B11",
+      "birthday": "2021-01-01",
+      "createdAt": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 944000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Bảo",
+      "diagnosis": "ASD Level 1",
+      "age": 5,
+      "parentId": "PH_KBC-HCM_Bảo_B11",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Chi_G20",
+      "birthday": "2020-01-01",
+      "createdAt": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 823000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Chi",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KBC-HCM_Chi_G20",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Hoàng_B07",
+      "birthday": "2020-01-01",
+      "createdAt": {
+        "_seconds": 1775833608,
+        "_nanoseconds": 702000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Hoàng",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KBC-HCM_Hoàng_B07",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Hương_G19",
+      "birthday": "2019-01-01",
+      "createdAt": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 510000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Hương",
+      "diagnosis": "ASD Level 1",
+      "age": 7,
+      "parentId": "PH_KBC-HCM_Hương_G19",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Hải_B04",
+      "birthday": "2019-01-01",
+      "createdAt": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 685000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Hải",
+      "diagnosis": "ASD Level 1",
+      "age": 7,
+      "parentId": "PH_KBC-HCM_Hải_B04",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Khoa_B02",
+      "birthday": "2022-01-01",
+      "createdAt": {
+        "_seconds": 1775833606,
+        "_nanoseconds": 983000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Khoa",
+      "diagnosis": "ASD Level 1",
+      "age": 4,
+      "parentId": "PH_KBC-HCM_Khoa_B02",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Khôi_B03",
+      "birthday": "2019-01-01",
+      "createdAt": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 333000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Minh Khôi",
+      "diagnosis": "ASD Level 1",
+      "age": 7,
+      "parentId": "PH_KBC-HCM_Khôi_B03",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Lan_G14",
+      "birthday": "2021-01-01",
+      "createdAt": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 914000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Lan",
+      "diagnosis": "ASD Level 1",
+      "age": 5,
+      "parentId": "PH_KBC-HCM_Lan_G14",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Linh_G21",
+      "birthday": "2019-01-01",
+      "createdAt": {
+        "_seconds": 1775833613,
+        "_nanoseconds": 182000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Linh",
+      "diagnosis": "ASD Level 1",
+      "age": 7,
+      "parentId": "PH_KBC-HCM_Linh_G21",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Long_B01",
+      "birthday": "2021-01-01",
+      "createdAt": {
+        "_seconds": 1775833606,
+        "_nanoseconds": 521000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Long",
+      "diagnosis": "ASD Level 1",
+      "age": 5,
+      "parentId": "PH_KBC-HCM_Long_B01",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Mai_G16",
+      "birthday": "2021-01-01",
+      "createdAt": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 540000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Mai",
+      "diagnosis": "ASD Level 1",
+      "age": 5,
+      "parentId": "PH_KBC-HCM_Mai_G16",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Mạnh_B09",
+      "birthday": "2022-01-01",
+      "createdAt": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 326000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Mạnh",
+      "diagnosis": "ASD Level 1",
+      "age": 4,
+      "parentId": "PH_KBC-HCM_Mạnh_B09",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Nam_B06",
+      "birthday": "2020-01-01",
+      "createdAt": {
+        "_seconds": 1775833608,
+        "_nanoseconds": 370000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Nam",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KBC-HCM_Nam_B06",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Ngọc_G15",
+      "birthday": "2020-01-01",
+      "createdAt": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 227000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Ngọc",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KBC-HCM_Ngọc_G15",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Nhi_G18",
+      "birthday": "2021-01-01",
+      "createdAt": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 196000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Nhi",
+      "diagnosis": "ASD Level 1",
+      "age": 5,
+      "parentId": "PH_KBC-HCM_Nhi_G18",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Phúc_B10",
+      "birthday": "2020-01-01",
+      "createdAt": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 637000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Phúc",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KBC-HCM_Phúc_B10",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Trang_G17",
+      "birthday": "2019-01-01",
+      "createdAt": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 871000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Trang",
+      "diagnosis": "ASD Level 1",
+      "age": 7,
+      "parentId": "PH_KBC-HCM_Trang_G17",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Trí_B13",
+      "birthday": "2020-01-01",
+      "createdAt": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 593000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Trí",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KBC-HCM_Trí_B13",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Tuấn_B05",
+      "birthday": "2020-01-01",
+      "createdAt": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 995000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Tuấn",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KBC-HCM_Tuấn_B05",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Việt_B08",
+      "birthday": "2019-01-01",
+      "createdAt": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 28000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Việt",
+      "diagnosis": "ASD Level 1",
+      "age": 7,
+      "parentId": "PH_KBC-HCM_Việt_B08",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    },
+    {
+      "id": "KBC-HCM_Đức_B12",
+      "birthday": "2020-01-01",
+      "createdAt": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 244000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "hpdt": 50,
+      "name": "Đức",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KBC-HCM_Đức_B12",
+      "schoolCode": "KBC-HCM",
+      "status": "Bình thường"
+    }
+  ],
+  "students": [
+    {
+      "id": "bt-611",
+      "createdAt": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 954000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "B",
+      "schoolId": "KBC-HCM",
+      "hpdt": 81,
+      "name": "Trần Bảo",
+      "diagnosis": "ASD Level 2",
+      "age": 8,
+      "parentId": "PH_BT-611",
+      "status": "Bình thường"
+    },
+    {
+      "id": "cl-135",
+      "createdAt": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 266000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "C",
+      "schoolId": "KBC-HCM",
+      "hpdt": 58,
+      "name": "Lê Chi",
+      "diagnosis": "ASD Level 3",
+      "age": 5,
+      "parentId": "PH_CL-135",
+      "status": "Bình thường"
+    },
+    {
+      "id": "hm-581",
+      "createdAt": {
+        "_seconds": 1775833008,
+        "_nanoseconds": 206000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "H",
+      "schoolId": "KBC-HCM",
+      "hpdt": 62,
+      "name": "Mạnh Hùng",
+      "diagnosis": "Asperger Syndrome",
+      "age": 7,
+      "parentId": "PH_HM-581",
+      "status": "Bình thường"
+    },
+    {
+      "id": "hoang-anh",
+      "teacherId": "GV_DUONG_01",
+      "initial": "A",
+      "schoolId": "KBC-HCM",
+      "hpdt": 62,
+      "name": "Hoàng Anh",
+      "status": "Bình thường",
+      "createdAt": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 55000000
+      },
+      "diagnosis": "ASD Level 1",
+      "age": 5,
+      "parentId": "PH_ANH_M01"
+    },
+    {
+      "id": "ht-648",
+      "createdAt": {
+        "_seconds": 1775833008,
+        "_nanoseconds": 519000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "H",
+      "schoolId": "KBC-HCM",
+      "hpdt": 77,
+      "name": "Thanh Hải",
+      "diagnosis": "Khó khăn phát triển",
+      "age": 3,
+      "parentId": "PH_HT-648",
+      "status": "Bình thường"
+    },
+    {
+      "id": "hv-956",
+      "createdAt": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 969000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "H",
+      "schoolId": "KBC-HCM",
+      "hpdt": 47,
+      "name": "Vũ Huy",
+      "diagnosis": "Khó khăn phát triển",
+      "age": 6,
+      "parentId": "PH_HV-956",
+      "status": "Bình thường"
+    },
+    {
+      "id": "k-349",
+      "createdAt": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 292000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "K",
+      "schoolId": "KBC-HCM",
+      "hpdt": 47,
+      "name": "Đức Khang",
+      "diagnosis": "Khó khăn phát triển",
+      "age": 8,
+      "parentId": "PH_KĐ-349",
+      "status": "Bình thường"
+    },
+    {
+      "id": "kt-143",
+      "createdAt": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 874000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "K",
+      "schoolId": "KBC-HCM",
+      "hpdt": 45,
+      "name": "Thanh Khang",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_KT-143",
+      "status": "Bình thường"
+    },
+    {
+      "id": "lg-877",
+      "createdAt": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 601000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "L",
+      "schoolId": "KBC-HCM",
+      "hpdt": 83,
+      "name": "Gia Linh",
+      "diagnosis": "ASD Level 3",
+      "age": 6,
+      "parentId": "PH_LG-877",
+      "status": "Bình thường"
+    },
+    {
+      "id": "ln-446",
+      "createdAt": {
+        "_seconds": 1775833014,
+        "_nanoseconds": 234000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "L",
+      "schoolId": "KBC-HCM",
+      "hpdt": 66,
+      "name": "Nhật Long",
+      "diagnosis": "ASD Level 2",
+      "age": 8,
+      "parentId": "PH_LN-446",
+      "status": "Bình thường"
+    },
+    {
+      "id": "ln-451",
+      "createdAt": {
+        "_seconds": 1775833007,
+        "_nanoseconds": 780000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "L",
+      "schoolId": "KBC-HCM",
+      "hpdt": 47,
+      "name": "Ngọc Lan",
+      "diagnosis": "ASD Level 3",
+      "age": 6,
+      "parentId": "PH_LN-451",
+      "status": "Bình thường"
+    },
+    {
+      "id": "manh-hung",
+      "teacherId": "GV_DUONG_01",
+      "initial": "M",
+      "schoolId": "KBC-HCM",
+      "hpdt": 45,
+      "name": "Mạnh Hùng",
+      "status": "Bình thường",
+      "createdAt": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 775000000
+      },
+      "diagnosis": "ASD Level 3",
+      "age": 4,
+      "parentId": "PH_HUNG_01"
+    },
+    {
+      "id": "mb-391",
+      "createdAt": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 956000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "M",
+      "schoolId": "KBC-HCM",
+      "hpdt": 87,
+      "name": "Bảo Minh",
+      "diagnosis": "Asperger Syndrome",
+      "age": 4,
+      "parentId": "PH_MB-391",
+      "status": "Bình thường"
+    },
+    {
+      "id": "minh-khoi",
+      "name": "Minh Khôi",
+      "diagnosis": "ASD Level 2",
+      "avatar": "/avatars/khoi.png",
+      "status": "Bình thường",
+      "teacherId": "GV_DUONG_01",
+      "initial": "K",
+      "schoolId": "KBC-HCM",
+      "hpdt": 75,
+      "parentId": "PH_KHOI_M01",
+      "createdAt": {
+        "_seconds": 1775833007,
+        "_nanoseconds": 360000000
+      },
+      "age": 8
+    },
+    {
+      "id": "n-962",
+      "createdAt": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 267000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "N",
+      "schoolId": "KBC-HCM",
+      "hpdt": 85,
+      "name": "Đinh Nam",
+      "diagnosis": "ASD Level 1",
+      "age": 4,
+      "parentId": "PH_NĐ-962",
+      "status": "Bình thường"
+    },
+    {
+      "id": "ngoc-lan",
+      "teacherId": "GV_DUONG_01",
+      "initial": "N",
+      "schoolId": "KBC-HCM",
+      "hpdt": 88,
+      "name": "Ngọc Lan",
+      "status": "Bình thường",
+      "createdAt": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 391000000
+      },
+      "diagnosis": "Asperger Syndrome",
+      "age": 7,
+      "parentId": "PH_LAN_01"
+    },
+    {
+      "id": "nn-109",
+      "createdAt": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 190000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "N",
+      "schoolId": "KBC-HCM",
+      "hpdt": 66,
+      "name": "Ngọc Ngọc",
+      "diagnosis": "Asperger Syndrome",
+      "age": 7,
+      "parentId": "PH_NN-109",
+      "status": "Bình thường"
+    },
+    {
+      "id": "np-357",
+      "createdAt": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 656000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "N",
+      "schoolId": "KBC-HCM",
+      "hpdt": 55,
+      "name": "Phạm Nhi",
+      "diagnosis": "Asperger Syndrome",
+      "age": 7,
+      "parentId": "PH_NP-357",
+      "status": "Bình thường"
+    },
+    {
+      "id": "pn-470",
+      "createdAt": {
+        "_seconds": 1775833008,
+        "_nanoseconds": 936000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "P",
+      "schoolId": "KBC-HCM",
+      "hpdt": 45,
+      "name": "Nhật Phong",
+      "diagnosis": "ASD Level 1",
+      "age": 4,
+      "parentId": "PH_PN-470",
+      "status": "Bình thường"
+    },
+    {
+      "id": "tm-114",
+      "createdAt": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 630000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "T",
+      "schoolId": "KBC-HCM",
+      "hpdt": 91,
+      "name": "Mai Tâm",
+      "diagnosis": "ASD Level 1",
+      "age": 6,
+      "parentId": "PH_TM-114",
+      "status": "Bình thường"
+    },
+    {
+      "id": "tt-855",
+      "createdAt": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 295000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "T",
+      "schoolId": "KBC-HCM",
+      "hpdt": 60,
+      "name": "Thùy Trang",
+      "diagnosis": "ASD Level 2",
+      "age": 6,
+      "parentId": "PH_TT-855",
+      "status": "Bình thường"
+    },
+    {
+      "id": "vh-268",
+      "createdAt": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 881000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "V",
+      "schoolId": "KBC-HCM",
+      "hpdt": 43,
+      "name": "Hoàng Vy",
+      "diagnosis": "ASD Level 3",
+      "age": 8,
+      "parentId": "PH_VH-268",
+      "status": "Bình thường"
+    },
+    {
+      "id": "vm-267",
+      "createdAt": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 485000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "V",
+      "schoolId": "KBC-HCM",
+      "hpdt": 75,
+      "name": "Mạnh Vy",
+      "diagnosis": "Khó khăn phát triển",
+      "age": 8,
+      "parentId": "PH_VM-267",
+      "status": "Bình thường"
+    },
+    {
+      "id": "vm-303",
+      "createdAt": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 584000000
+      },
+      "teacherId": "GV_DUONG_01",
+      "initial": "V",
+      "schoolId": "KBC-HCM",
+      "hpdt": 80,
+      "name": "Minh Việt",
+      "diagnosis": "ASD Level 2",
+      "age": 3,
+      "parentId": "PH_VM-303",
+      "status": "Bình thường"
+    }
+  ],
+  "hpdt_stats": [
+    {
+      "id": "KBC-HCM_Bảo_B11",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 44000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Chi_G20",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 923000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Hoàng_B07",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833608,
+        "_nanoseconds": 824000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Hương_G19",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 604000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Hải_B04",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 787000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Khoa_B02",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 110000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Khôi_B03",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 440000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Lan_G14",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 10000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Linh_G21",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833613,
+        "_nanoseconds": 311000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Long_B01",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833606,
+        "_nanoseconds": 711000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Mai_G16",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 642000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Mạnh_B09",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 434000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Nam_B06",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833608,
+        "_nanoseconds": 496000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Ngọc_G15",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 331000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Nhi_G18",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 296000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Phúc_B10",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 743000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Trang_G17",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 986000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Trí_B13",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 689000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Tuấn_B05",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833608,
+        "_nanoseconds": 112000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Việt_B08",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 130000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "KBC-HCM_Đức_B12",
+      "overallScore": 50,
+      "lastUpdate": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 359000000
+      },
+      "dimensions": {
+        "sensory": 50,
+        "social": 50,
+        "behavior": 50,
+        "communication": 50
+      }
+    },
+    {
+      "id": "bt-611",
+      "overallScore": 81,
+      "lastUpdate": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 59000000
+      },
+      "dimensions": {
+        "sensory": 87,
+        "social": 65,
+        "behavior": 84,
+        "communication": 76
+      }
+    },
+    {
+      "id": "cl-135",
+      "overallScore": 58,
+      "lastUpdate": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 366000000
+      },
+      "dimensions": {
+        "sensory": 66,
+        "social": 83,
+        "behavior": 29,
+        "communication": 71
+      }
+    },
+    {
+      "id": "hm-581",
+      "overallScore": 62,
+      "lastUpdate": {
+        "_seconds": 1775833008,
+        "_nanoseconds": 316000000
+      },
+      "dimensions": {
+        "sensory": 69,
+        "social": 39,
+        "behavior": 47,
+        "communication": 40
+      }
+    },
+    {
+      "id": "hoang-anh",
+      "overallScore": 62,
+      "lastUpdate": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 173000000
+      },
+      "dimensions": {
+        "sensory": 65,
+        "social": 60,
+        "behavior": 55,
+        "communication": 70
+      }
+    },
+    {
+      "id": "ht-648",
+      "overallScore": 77,
+      "lastUpdate": {
+        "_seconds": 1775833008,
+        "_nanoseconds": 652000000
+      },
+      "dimensions": {
+        "sensory": 44,
+        "social": 52,
+        "behavior": 75,
+        "communication": 34
+      }
+    },
+    {
+      "id": "hv-956",
+      "overallScore": 47,
+      "lastUpdate": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 65000000
+      },
+      "dimensions": {
+        "sensory": 61,
+        "social": 62,
+        "behavior": 89,
+        "communication": 76
+      }
+    },
+    {
+      "id": "k-349",
+      "overallScore": 47,
+      "lastUpdate": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 394000000
+      },
+      "dimensions": {
+        "sensory": 66,
+        "social": 76,
+        "behavior": 54,
+        "communication": 25
+      }
+    },
+    {
+      "id": "kt-143",
+      "overallScore": 45,
+      "lastUpdate": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 973000000
+      },
+      "dimensions": {
+        "sensory": 79,
+        "social": 71,
+        "behavior": 42,
+        "communication": 57
+      }
+    },
+    {
+      "id": "lg-877",
+      "overallScore": 83,
+      "lastUpdate": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 709000000
+      },
+      "dimensions": {
+        "sensory": 78,
+        "social": 36,
+        "behavior": 91,
+        "communication": 68
+      }
+    },
+    {
+      "id": "ln-446",
+      "overallScore": 66,
+      "lastUpdate": {
+        "_seconds": 1775833014,
+        "_nanoseconds": 431000000
+      },
+      "dimensions": {
+        "sensory": 64,
+        "social": 86,
+        "behavior": 44,
+        "communication": 50
+      }
+    },
+    {
+      "id": "ln-451",
+      "overallScore": 47,
+      "lastUpdate": {
+        "_seconds": 1775833007,
+        "_nanoseconds": 917000000
+      },
+      "dimensions": {
+        "sensory": 73,
+        "social": 93,
+        "behavior": 64,
+        "communication": 27
+      }
+    },
+    {
+      "id": "manh-hung",
+      "overallScore": 45,
+      "lastUpdate": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 870000000
+      },
+      "dimensions": {
+        "sensory": 55,
+        "social": 35,
+        "behavior": 50,
+        "communication": 40
+      }
+    },
+    {
+      "id": "mb-391",
+      "overallScore": 87,
+      "lastUpdate": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 54000000
+      },
+      "dimensions": {
+        "sensory": 63,
+        "social": 68,
+        "behavior": 28,
+        "communication": 29
+      }
+    },
+    {
+      "id": "minh-khoi",
+      "overallScore": 75,
+      "lastUpdate": {
+        "_seconds": 1775833007,
+        "_nanoseconds": 515000000
+      },
+      "dimensions": {
+        "sensory": 24,
+        "social": 45,
+        "behavior": 65,
+        "communication": 34
+      }
+    },
+    {
+      "id": "n-962",
+      "overallScore": 85,
+      "lastUpdate": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 367000000
+      },
+      "dimensions": {
+        "sensory": 32,
+        "social": 86,
+        "behavior": 72,
+        "communication": 39
+      }
+    },
+    {
+      "id": "ngoc-lan",
+      "overallScore": 88,
+      "lastUpdate": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 512000000
+      },
+      "dimensions": {
+        "sensory": 88,
+        "social": 75,
+        "behavior": 90,
+        "communication": 85
+      }
+    },
+    {
+      "id": "nn-109",
+      "overallScore": 66,
+      "lastUpdate": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 286000000
+      },
+      "dimensions": {
+        "sensory": 60,
+        "social": 54,
+        "behavior": 37,
+        "communication": 27
+      }
+    },
+    {
+      "id": "np-357",
+      "overallScore": 55,
+      "lastUpdate": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 756000000
+      },
+      "dimensions": {
+        "sensory": 47,
+        "social": 39,
+        "behavior": 68,
+        "communication": 81
+      }
+    },
+    {
+      "id": "pn-470",
+      "overallScore": 45,
+      "lastUpdate": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 31000000
+      },
+      "dimensions": {
+        "sensory": 91,
+        "social": 40,
+        "behavior": 70,
+        "communication": 74
+      }
+    },
+    {
+      "id": "tm-114",
+      "overallScore": 91,
+      "lastUpdate": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 731000000
+      },
+      "dimensions": {
+        "sensory": 69,
+        "social": 26,
+        "behavior": 45,
+        "communication": 88
+      }
+    },
+    {
+      "id": "tt-855",
+      "overallScore": 60,
+      "lastUpdate": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 408000000
+      },
+      "dimensions": {
+        "sensory": 49,
+        "social": 24,
+        "behavior": 61,
+        "communication": 71
+      }
+    },
+    {
+      "id": "vh-268",
+      "overallScore": 43,
+      "lastUpdate": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 986000000
+      },
+      "dimensions": {
+        "sensory": 59,
+        "social": 53,
+        "behavior": 58,
+        "communication": 63
+      }
+    },
+    {
+      "id": "vm-267",
+      "overallScore": 75,
+      "lastUpdate": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 612000000
+      },
+      "dimensions": {
+        "sensory": 46,
+        "social": 66,
+        "behavior": 51,
+        "communication": 79
+      }
+    },
+    {
+      "id": "vm-303",
+      "overallScore": 80,
+      "lastUpdate": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 685000000
+      },
+      "dimensions": {
+        "sensory": 46,
+        "social": 90,
+        "behavior": 90,
+        "communication": 85
+      }
+    }
+  ],
+  "users": [
+    {
+      "id": "GV_DUONG_01",
+      "email": "teacher@ai4autism.com",
+      "displayName": "Cô Dương",
+      "role": "teacher",
+      "schoolId": "KBC-HCM",
+      "centerCode": "KBC-HCM",
+      "schoolName": "Kim Bình Center",
+      "createdAt": {
+        "_seconds": 1775832897,
+        "_nanoseconds": 439000000
+      }
+    },
+    {
+      "id": "GV_KBC_Hoa07",
+      "customId": "GV_KBC_Hoa07",
+      "password": "K$Ivv!O7No",
+      "role": "teacher",
+      "fullName": "Cô Hoa",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Hoang05",
+      "customId": "GV_KBC_Hoang05",
+      "password": "jj8FX4!X*q",
+      "role": "teacher",
+      "fullName": "Thầy Hoàng",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_HongNgan02",
+      "customId": "GV_KBC_HongNgan02",
+      "password": "8zM$xvK0bG",
+      "role": "teacher",
+      "fullName": "Cô Hồng Ngân",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Huyen12",
+      "customId": "GV_KBC_Huyen12",
+      "password": "h1W$k#E@$A",
+      "role": "teacher",
+      "fullName": "Cô Huyền",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Khiem08",
+      "customId": "GV_KBC_Khiem08",
+      "password": "brmDBzGC46",
+      "role": "teacher",
+      "fullName": "Thầy Khiêm",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_MaiAn10",
+      "customId": "GV_KBC_MaiAn10",
+      "password": "tcNJWr254j",
+      "role": "teacher",
+      "fullName": "Cô Mai An",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Nghi06",
+      "customId": "GV_KBC_Nghi06",
+      "password": "rjoFB#0HZB",
+      "role": "teacher",
+      "fullName": "Cô Nghi",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Quynh04",
+      "customId": "GV_KBC_Quynh04",
+      "password": "xZZG7i*z5Y",
+      "role": "teacher",
+      "fullName": "Cô Quỳnh",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Thao03",
+      "customId": "GV_KBC_Thao03",
+      "password": "NDt5PDaKfe",
+      "role": "teacher",
+      "fullName": "Cô Thảo",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Trang11",
+      "customId": "GV_KBC_Trang11",
+      "password": "k*VLBRgne0",
+      "role": "teacher",
+      "fullName": "Cô Trang",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Tuyen09",
+      "customId": "GV_KBC_Tuyen09",
+      "password": "jOjYkh7ngf",
+      "role": "teacher",
+      "fullName": "Cô Tuyến",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "GV_KBC_Vy01",
+      "customId": "GV_KBC_Vy01",
+      "password": "AZ1kJ&0!T6",
+      "role": "teacher",
+      "fullName": "Cô Vy",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_ANH_M01",
+      "createdAt": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 289000000
+      },
+      "role": "parent",
+      "displayName": "Mẹ Hoàng Anh",
+      "childId": "hoang-anh",
+      "email": "parent_hoang-anh@ai4autism.com"
+    },
+    {
+      "id": "PH_An_G16",
+      "customId": "PH_An_G16",
+      "password": "Evmitg&fAg",
+      "role": "parent",
+      "childId": "16",
+      "fullName": "Phụ huynh Vũ Đạt Phúc An",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Anh_B10",
+      "customId": "PH_Anh_B10",
+      "password": "m9QR5YOrm4",
+      "role": "parent",
+      "childId": "10",
+      "fullName": "Phụ huynh Lại Thế Anh",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Anh_G19",
+      "customId": "PH_Anh_G19",
+      "password": "b$LUAx0apt",
+      "role": "parent",
+      "childId": "19",
+      "fullName": "Phụ huynh Đặng Bình Minh Anh",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_BT-611",
+      "createdAt": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 157000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Bảo",
+      "childId": "bt-611",
+      "email": "parent_bt-611@ai4autism.com"
+    },
+    {
+      "id": "PH_Bao_B14",
+      "customId": "PH_Bao_B14",
+      "password": "5&f*6!93VW",
+      "role": "parent",
+      "childId": "14",
+      "fullName": "Phụ huynh Lương Minh Bảo",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_CL-135",
+      "createdAt": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 471000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Chi",
+      "childId": "cl-135",
+      "email": "parent_cl-135@ai4autism.com"
+    },
+    {
+      "id": "PH_Duc_B06",
+      "customId": "PH_Duc_B06",
+      "password": "0iPYjfxQr8",
+      "role": "parent",
+      "childId": "6",
+      "fullName": "Phụ huynh Nguyễn Quý Minh Đức",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_HM-581",
+      "createdAt": {
+        "_seconds": 1775833008,
+        "_nanoseconds": 422000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Hùng",
+      "childId": "hm-581",
+      "email": "parent_hm-581@ai4autism.com"
+    },
+    {
+      "id": "PH_HT-648",
+      "createdAt": {
+        "_seconds": 1775833008,
+        "_nanoseconds": 817000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Hải",
+      "childId": "ht-648",
+      "email": "parent_ht-648@ai4autism.com"
+    },
+    {
+      "id": "PH_HUNG_01",
+      "createdAt": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 991000000
+      },
+      "role": "parent",
+      "displayName": "Mẹ Mạnh Hùng",
+      "childId": "manh-hung",
+      "email": "parent_manh-hung@ai4autism.com"
+    },
+    {
+      "id": "PH_HV-956",
+      "createdAt": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 175000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Huy",
+      "childId": "hv-956",
+      "email": "parent_hv-956@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Bảo_B11",
+      "createdAt": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 144000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Bảo",
+      "childId": "KBC-HCM_Bảo_B11",
+      "email": "parent_kbc-hcm_bảo_b11@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Chi_G20",
+      "createdAt": {
+        "_seconds": 1775833613,
+        "_nanoseconds": 25000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Chi",
+      "childId": "KBC-HCM_Chi_G20",
+      "email": "parent_kbc-hcm_chi_g20@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Hoàng_B07",
+      "createdAt": {
+        "_seconds": 1775833608,
+        "_nanoseconds": 916000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Hoàng",
+      "childId": "KBC-HCM_Hoàng_B07",
+      "email": "parent_kbc-hcm_hoàng_b07@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Hương_G19",
+      "createdAt": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 722000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Hương",
+      "childId": "KBC-HCM_Hương_G19",
+      "email": "parent_kbc-hcm_hương_g19@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Hải_B04",
+      "createdAt": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 900000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Hải",
+      "childId": "KBC-HCM_Hải_B04",
+      "email": "parent_kbc-hcm_hải_b04@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Khoa_B02",
+      "createdAt": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 221000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Khoa",
+      "childId": "KBC-HCM_Khoa_B02",
+      "email": "parent_kbc-hcm_khoa_b02@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Khôi_B03",
+      "createdAt": {
+        "_seconds": 1775833607,
+        "_nanoseconds": 551000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Khôi",
+      "childId": "KBC-HCM_Khôi_B03",
+      "email": "parent_kbc-hcm_khôi_b03@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Lan_G14",
+      "createdAt": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 130000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Lan",
+      "childId": "KBC-HCM_Lan_G14",
+      "email": "parent_kbc-hcm_lan_g14@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Linh_G21",
+      "createdAt": {
+        "_seconds": 1775833613,
+        "_nanoseconds": 422000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Linh",
+      "childId": "KBC-HCM_Linh_G21",
+      "email": "parent_kbc-hcm_linh_g21@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Long_B01",
+      "createdAt": {
+        "_seconds": 1775833606,
+        "_nanoseconds": 842000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Long",
+      "childId": "KBC-HCM_Long_B01",
+      "email": "parent_kbc-hcm_long_b01@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Mai_G16",
+      "createdAt": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 752000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Mai",
+      "childId": "KBC-HCM_Mai_G16",
+      "email": "parent_kbc-hcm_mai_g16@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Mạnh_B09",
+      "createdAt": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 532000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Mạnh",
+      "childId": "KBC-HCM_Mạnh_B09",
+      "email": "parent_kbc-hcm_mạnh_b09@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Nam_B06",
+      "createdAt": {
+        "_seconds": 1775833608,
+        "_nanoseconds": 608000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Nam",
+      "childId": "KBC-HCM_Nam_B06",
+      "email": "parent_kbc-hcm_nam_b06@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Ngọc_G15",
+      "createdAt": {
+        "_seconds": 1775833611,
+        "_nanoseconds": 432000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Ngọc",
+      "childId": "KBC-HCM_Ngọc_G15",
+      "email": "parent_kbc-hcm_ngọc_g15@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Nhi_G18",
+      "createdAt": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 412000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Nhi",
+      "childId": "KBC-HCM_Nhi_G18",
+      "email": "parent_kbc-hcm_nhi_g18@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Phúc_B10",
+      "createdAt": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 849000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Phúc",
+      "childId": "KBC-HCM_Phúc_B10",
+      "email": "parent_kbc-hcm_phúc_b10@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Trang_G17",
+      "createdAt": {
+        "_seconds": 1775833612,
+        "_nanoseconds": 92000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Trang",
+      "childId": "KBC-HCM_Trang_G17",
+      "email": "parent_kbc-hcm_trang_g17@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Trí_B13",
+      "createdAt": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 790000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Trí",
+      "childId": "KBC-HCM_Trí_B13",
+      "email": "parent_kbc-hcm_trí_b13@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Tuấn_B05",
+      "createdAt": {
+        "_seconds": 1775833608,
+        "_nanoseconds": 274000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Tuấn",
+      "childId": "KBC-HCM_Tuấn_B05",
+      "email": "parent_kbc-hcm_tuấn_b05@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Việt_B08",
+      "createdAt": {
+        "_seconds": 1775833609,
+        "_nanoseconds": 228000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Việt",
+      "childId": "KBC-HCM_Việt_B08",
+      "email": "parent_kbc-hcm_việt_b08@ai4autism.com"
+    },
+    {
+      "id": "PH_KBC-HCM_Đức_B12",
+      "createdAt": {
+        "_seconds": 1775833610,
+        "_nanoseconds": 450000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Đức",
+      "childId": "KBC-HCM_Đức_B12",
+      "email": "parent_kbc-hcm_đức_b12@ai4autism.com"
+    },
+    {
+      "id": "PH_KHOI_M01",
+      "displayName": "Mẹ Minh Khôi",
+      "role": "parent",
+      "childId": "minh-khoi",
+      "email": "parent_minh-khoi@ai4autism.com",
+      "createdAt": {
+        "_seconds": 1775833007,
+        "_nanoseconds": 672000000
+      }
+    },
+    {
+      "id": "PH_KT-143",
+      "createdAt": {
+        "_seconds": 1775833014,
+        "_nanoseconds": 106000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Khang",
+      "childId": "kt-143",
+      "email": "parent_kt-143@ai4autism.com"
+    },
+    {
+      "id": "PH_Khang_B04",
+      "customId": "PH_Khang_B04",
+      "password": "Z&!sri&sWf",
+      "role": "parent",
+      "childId": "4",
+      "fullName": "Phụ huynh Dương Minh Khang",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Khang_B07",
+      "customId": "PH_Khang_B07",
+      "password": "gCy##4nY#k",
+      "role": "parent",
+      "childId": "7",
+      "fullName": "Phụ huynh Thi Phúc Khang",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Khang_B08",
+      "customId": "PH_Khang_B08",
+      "password": "f&eY^sgG1D",
+      "role": "parent",
+      "childId": "8",
+      "fullName": "Phụ huynh Lê Minh Khang",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Khang_B20",
+      "customId": "PH_Khang_B20",
+      "password": "EjgINCY3BO",
+      "role": "parent",
+      "childId": "20",
+      "fullName": "Phụ huynh Lê Trung Khang",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Khoa_B17",
+      "customId": "PH_Khoa_B17",
+      "password": "lVVNtzRxtJ",
+      "role": "parent",
+      "childId": "17",
+      "fullName": "Phụ huynh Nguyễn Hoàng Đăng Khoa",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Khoi_B02",
+      "customId": "PH_Khoi_B02",
+      "password": "$GcQ&zZIc8",
+      "role": "parent",
+      "childId": "2",
+      "fullName": "Phụ huynh Nguyễn Đăng Khôi",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_KĐ-349",
+      "createdAt": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 526000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Khang",
+      "childId": "k-349",
+      "email": "parent_k-349@ai4autism.com"
+    },
+    {
+      "id": "PH_LAN_01",
+      "createdAt": {
+        "_seconds": 1775832898,
+        "_nanoseconds": 647000000
+      },
+      "role": "parent",
+      "displayName": "Bố Ngọc Lan",
+      "childId": "ngoc-lan",
+      "email": "parent_ngoc-lan@ai4autism.com"
+    },
+    {
+      "id": "PH_LG-877",
+      "createdAt": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 827000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Linh",
+      "childId": "lg-877",
+      "email": "parent_lg-877@ai4autism.com"
+    },
+    {
+      "id": "PH_LN-446",
+      "createdAt": {
+        "_seconds": 1775833014,
+        "_nanoseconds": 522000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Long",
+      "childId": "ln-446",
+      "email": "parent_ln-446@ai4autism.com"
+    },
+    {
+      "id": "PH_LN-451",
+      "createdAt": {
+        "_seconds": 1775833008,
+        "_nanoseconds": 95000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Lan",
+      "childId": "ln-451",
+      "email": "parent_ln-451@ai4autism.com"
+    },
+    {
+      "id": "PH_Lam_B05",
+      "customId": "PH_Lam_B05",
+      "password": "voW$$D02zC",
+      "role": "parent",
+      "childId": "5",
+      "fullName": "Phụ huynh Trương Thanh Lâm",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Long_B01",
+      "customId": "PH_Long_B01",
+      "password": "OTv6$MNTD5",
+      "role": "parent",
+      "childId": "1",
+      "fullName": "Phụ huynh Nguyễn Trường Long",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Long_B11",
+      "customId": "PH_Long_B11",
+      "password": "8R9*oBNlZl",
+      "role": "parent",
+      "childId": "11",
+      "fullName": "Phụ huynh Lê Doãn Bảo Long",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_MB-391",
+      "createdAt": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 185000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Minh",
+      "childId": "mb-391",
+      "email": "parent_mb-391@ai4autism.com"
+    },
+    {
+      "id": "PH_NN-109",
+      "createdAt": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 383000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Ngọc",
+      "childId": "nn-109",
+      "email": "parent_nn-109@ai4autism.com"
+    },
+    {
+      "id": "PH_NP-357",
+      "createdAt": {
+        "_seconds": 1775833011,
+        "_nanoseconds": 856000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Nhi",
+      "childId": "np-357",
+      "email": "parent_np-357@ai4autism.com"
+    },
+    {
+      "id": "PH_Nghia_B15",
+      "customId": "PH_Nghia_B15",
+      "password": "%bB&&hmLRu",
+      "role": "parent",
+      "childId": "15",
+      "fullName": "Phụ huynh Phan Văn Trọng Nghĩa",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Ninh_B21",
+      "customId": "PH_Ninh_B21",
+      "password": "KnXWCZisNB",
+      "role": "parent",
+      "childId": "21",
+      "fullName": "Phụ huynh Nguyễn Khải Ninh",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_NĐ-962",
+      "createdAt": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 481000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Nam",
+      "childId": "n-962",
+      "email": "parent_n-962@ai4autism.com"
+    },
+    {
+      "id": "PH_PN-470",
+      "createdAt": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 176000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Phong",
+      "childId": "pn-470",
+      "email": "parent_pn-470@ai4autism.com"
+    },
+    {
+      "id": "PH_Phong_B03",
+      "customId": "PH_Phong_B03",
+      "password": "f2FvekNC6Z",
+      "role": "parent",
+      "childId": "3",
+      "fullName": "Phụ huynh Trương Thanh Phong",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Phuc_B18",
+      "customId": "PH_Phuc_B18",
+      "password": "#3vKr@BR@P",
+      "role": "parent",
+      "childId": "18",
+      "fullName": "Phụ huynh Trần Gia Phúc",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Phuoc_B13",
+      "customId": "PH_Phuoc_B13",
+      "password": "hhsJhUwZ00",
+      "role": "parent",
+      "childId": "13",
+      "fullName": "Phụ huynh Nguyễn Tiến Phước",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_TM-114",
+      "createdAt": {
+        "_seconds": 1775833010,
+        "_nanoseconds": 833000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Tâm",
+      "childId": "tm-114",
+      "email": "parent_tm-114@ai4autism.com"
+    },
+    {
+      "id": "PH_TT-855",
+      "createdAt": {
+        "_seconds": 1775833009,
+        "_nanoseconds": 502000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Trang",
+      "childId": "tt-855",
+      "email": "parent_tt-855@ai4autism.com"
+    },
+    {
+      "id": "PH_Thien_B09",
+      "customId": "PH_Thien_B09",
+      "password": "rMU*YTqncX",
+      "role": "parent",
+      "childId": "9",
+      "fullName": "Phụ huynh Phạm Quang Thiên",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_Tran_G12",
+      "customId": "PH_Tran_G12",
+      "password": "sg9VDeuD6R",
+      "role": "parent",
+      "childId": "12",
+      "fullName": "Phụ huynh Mai Hoàng Bảo Trân",
+      "centerCode": "KBC"
+    },
+    {
+      "id": "PH_VH-268",
+      "createdAt": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 88000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Vy",
+      "childId": "vh-268",
+      "email": "parent_vh-268@ai4autism.com"
+    },
+    {
+      "id": "PH_VM-267",
+      "createdAt": {
+        "_seconds": 1775833013,
+        "_nanoseconds": 770000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Vy",
+      "childId": "vm-267",
+      "email": "parent_vm-267@ai4autism.com"
+    },
+    {
+      "id": "PH_VM-303",
+      "createdAt": {
+        "_seconds": 1775833012,
+        "_nanoseconds": 787000000
+      },
+      "role": "parent",
+      "displayName": "Phụ huynh của Việt",
+      "childId": "vm-303",
+      "email": "parent_vm-303@ai4autism.com"
+    }
+  ],
+  "schools": [
+    {
+      "id": "KBC-HCM",
+      "schoolName": "Kim Bình Center",
+      "centerCode": "KBC-HCM",
+      "city": "Hồ Chí Minh",
+      "createdAt": {
+        "_seconds": 1775832897,
+        "_nanoseconds": 276000000
+      }
+    }
+  ],
+  "video_modeling": [],
+  "videos": []
+}
