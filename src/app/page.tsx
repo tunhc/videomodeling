@@ -7,18 +7,8 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to login if no session found
-    const userId = localStorage.getItem("userId");
-    if (!userId) {
-      router.push("/login");
-    } else {
-      const role = localStorage.getItem("userRole");
-      if (role === "teacher") {
-        router.push("/teacher");
-      } else {
-        router.push("/parent");
-      }
-    }
+    // Force redirect to login from root to avoid stale session confusion
+    router.replace("/login");
   }, [router]);
 
   return (
