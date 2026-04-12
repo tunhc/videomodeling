@@ -4,6 +4,8 @@ import { X, Upload, CheckCircle2, Loader2, Sparkles, ChevronRight, Video, Home, 
 import { useRouter } from "next/navigation";
 import { videoService } from "@/lib/services/videoService";
 import { cloudinaryService } from "@/lib/services/cloudinaryService";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 interface VideoUploadModalProps {
   isOpen: boolean;
@@ -11,9 +13,19 @@ interface VideoUploadModalProps {
   role: "parent" | "teacher";
   childId?: string | null;
   initialTopic?: string;
+  initialLesson?: string;
+  initialCategory?: string;
 }
 
-export default function VideoUploadModal({ isOpen, onClose, role, childId, initialTopic }: VideoUploadModalProps) {
+export default function VideoUploadModal({ 
+  isOpen, 
+  onClose, 
+  role, 
+  childId, 
+  initialTopic,
+  initialLesson,
+  initialCategory 
+}: VideoUploadModalProps) {
   const router = useRouter();
   const [step, setStep] = useState<"upload" | "processing" | "labeling" | "context" | "success">("upload");
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
@@ -80,12 +92,42 @@ export default function VideoUploadModal({ isOpen, onClose, role, childId, initi
         }, 3000);
       });
 
-      const activeChildId = childId || "KBC-HCM_Long_B01";
-      const finalTopic = initialTopic || video.name;
+      // Resolve Child Metadata for Cloudinary Folder Organization
+      let activeChildId = childId;
+      let centerCode = "KBC";
+      let childName = "";
 
-      // 2. Upload to Cloudinary
+      // If parent and no childId passed, resolve from localStorage/Profile
+      if (role === "parent" && !activeChildId) {
+         const userId = localStorage.getItem("userId") || "";
+         activeChildId = userId.replace("PH_", "");
+      }
+
+      // Fetch Child data to get schoolCode (centerCode) and name
+      if (activeChildId) {
+        try {
+          const childSnap = await getDoc(doc(db, "children", activeChildId));
+          if (childSnap.exists()) {
+            const data = childSnap.data();
+            centerCode = data.schoolCode || "KBC";
+            childName = data.name || "";
+          }
+        } catch (e) {
+          console.error("Failed to fetch child data:", e);
+        }
+      }
+
+      const uploadChildId = activeChildId || "KBC-HCM_Long_B01";
+      
+      const now = new Date();
+      const timestamp = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()} ${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const defaultName = childName ? `${childName} - ${timestamp}` : video.name;
+      const finalTopic = initialTopic || defaultName;
+
+      // 2. Upload to Cloudinary with metadata for organization
       const cloudinaryResult = await cloudinaryService.uploadVideo(
         video,
+        { childId: uploadChildId, centerName: centerCode, role: role },
         (progress) => setUploadProgress(progress),
         abortControllerRef.current
       );
@@ -93,13 +135,15 @@ export default function VideoUploadModal({ isOpen, onClose, role, childId, initi
       // 3. Register Metadata in Firebase
       const newVideo = await videoService.registerVideoMetadata(
         cloudinaryResult.secureUrl, 
-        activeChildId,
+        uploadChildId,
         selectedEmotions[0] || "General", 
         { 
           allTags: selectedEmotions,
           context: currentContext === "School" ? "school" : "home",
           topic: finalTopic,
-          duration: Math.round(duration)
+          duration: Math.round(duration),
+          lesson: initialLesson || "",
+          category: initialCategory || ""
         },
         role
       );

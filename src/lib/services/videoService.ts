@@ -56,8 +56,9 @@ export const videoService = {
       }
     }
 
-    // 2. Obfuscate URL for database storage privacy as requested
-    const storedUrl = cloudinaryService.obfuscateUrl(videoUrl);
+    // 2. Optimize and Obfuscate URL for database storage privacy as requested
+    const optimizedUrl = cloudinaryService.optimizeUrl(videoUrl);
+    const storedUrl = cloudinaryService.obfuscateUrl(optimizedUrl);
 
     const videoData: Omit<VideoMetadata, "id"> = {
       url: storedUrl, // Obfuscated
@@ -66,6 +67,8 @@ export const videoService = {
       teacherId: assignedTeacherId, // Added for isolation
       role: role,
       primaryTag: primaryTag,
+      category: metadata.category || "", // Added for ABA mapping
+      lesson: metadata.lesson || "", // Added for ABA mapping
       allTags: [primaryTag, ...(metadata.allTags || [])],
       context: metadata.context || "home",
       topic: metadata.topic || "Hoạt động tự phát",

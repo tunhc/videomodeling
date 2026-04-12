@@ -45,9 +45,18 @@ export default function TeacherHome() {
           const data = teacherDoc.data();
           setUserName(data.displayName || "Giáo viên");
 
-          if (data.schoolId) {
-            const schoolDoc = await getDoc(doc(db, "schools", data.schoolId));
-            if (schoolDoc.exists()) setSchool(schoolDoc.data() as School);
+          // Priority 1: user.schoolId
+          // Priority 2: user.centerCode (treat as schoolId if schoolId missing)
+          const targetSchoolId = data.schoolId || data.centerCode;
+          
+          if (targetSchoolId) {
+            const schoolDoc = await getDoc(doc(db, "schools", targetSchoolId));
+            if (schoolDoc.exists()) {
+              setSchool(schoolDoc.data() as School);
+            } else {
+              // Fallback if school doc doesn't exist but we have a code
+              setSchool({ schoolName: "Kim Bình Center", centerCode: targetSchoolId, city: "HCM" });
+            }
           }
         }
 

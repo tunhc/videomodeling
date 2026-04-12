@@ -7,6 +7,7 @@ export const cloudinaryService = {
    */
   async uploadVideo(
     file: File,
+    metadata: { childId: string; centerName: string; role?: string },
     onProgress?: (progress: number) => void,
     abortController?: AbortController
   ) {
@@ -21,9 +22,10 @@ export const cloudinaryService = {
     formData.append("file", file);
     formData.append("upload_preset", uploadPreset);
     
-    // Obfuscate naming: Cloudinary will generate a random public_id if not specified, 
-    // or we can specify one. We'll let Cloudinary handle the randomness for security.
-    formData.append("folder", "ai4autism_videos");
+    // Dynamic folder structure and tagging based on child info
+    formData.append("folder", `AI4Autism/${metadata.centerName}/Children/${metadata.childId}`);
+    formData.append("public_id", `${metadata.childId}_${Date.now()}`);
+    formData.append("tags", `${metadata.childId},${metadata.centerName}${metadata.role ? ',' + metadata.role : ''},vst-auto-upload`);
 
     return new Promise<{ url: string; publicId: string; secureUrl: string }>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -62,13 +64,27 @@ export const cloudinaryService = {
   },
 
   /**
+   * Apply Cloudinary optimization parameters (f_auto, q_auto) to the URL
+   */
+  optimizeUrl(url: string) {
+    if (!url || !url.includes("cloudinary.com")) return url;
+    
+    // Check if already optimized or contains transformations
+    if (url.includes("/f_auto,q_auto/")) return url;
+    
+    // Standard format: .../upload/v12345/public_id
+    // Target format: .../upload/f_auto,q_auto/v12345/public_id
+    return url.replace("/upload/", "/upload/f_auto,q_auto/");
+  },
+
+  /**
    * Simple obfuscation for the URL to prevent casual inspection in Firestore
    * (As requested by user "mã hóa link cloudi cho phù hợp")
    */
   obfuscateUrl(url: string) {
     try {
       return btoa(url); // Base64 encoding
-    } catch (e) {
+    } catch {
       return url;
     }
   },
@@ -76,8 +92,9 @@ export const cloudinaryService = {
   deobfuscateUrl(obfuscatedUrl: string) {
     try {
       return atob(obfuscatedUrl);
-    } catch (e) {
+    } catch {
       return obfuscatedUrl;
     }
   }
 };
+

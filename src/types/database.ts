@@ -7,7 +7,9 @@ export interface VideoMetadata {
   senderId: string;
   childId: string;
   role: Role;
-  primaryTag: string; // The behavioral category
+  primaryTag: string; // The behavioral category (e.g., social, communication)
+  category?: string; // Human-readable category (e.g., Tự phục vụ, Vận động)
+  lesson?: string; // Specific lesson name (e.g., Dọn dẹp bàn học)
   allTags: string[];
   context: "home" | "school" | "commute" | "public";
   topic: string; // Specific activity within tag

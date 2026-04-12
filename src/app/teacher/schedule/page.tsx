@@ -5,45 +5,52 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Calendar, Clock, User, Sparkles, ChevronRight, BookOpen, 
   Brain, Star, Upload, Loader2, Users, CheckCircle, Info,
-  Wand2, X
+  Wand2, X, RefreshCw, ChevronLeft, Target, Zap
 } from "lucide-react";
 import VideoUploadModal from "@/components/VideoUploadModal";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
-import { videoService } from "@/lib/services/videoService";
-import { generateLessonPlanAction } from "@/app/actions/gemini";
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
+import { generateWeeklyScheduleAction, generateLessonPlanAction } from "@/app/actions/gemini";
 
-const DOMAIN_GOALS: Record<string, string[]> = {
-  social: ["Chào hỏi giáo viên", "Chơi luân phiên", "Tương tác mắt"],
-  communication: ["Yêu cầu đồ chơi", "Phát âm nguyên âm", "Chỉ tay vào vật"],
-  behavior: ["Ngồi yên tại chỗ", "Lắng nghe chỉ dẫn", "Tự cất đồ chơi"],
-  sensory: ["Vận động thăng bằng", "Phối hợp tay mắt", "Nhận biết xúc giác"],
-  cognitive: ["Sắp xếp khối màu", "Phân loại hình dạng", "Hoàn thành Puzzle"]
-};
+interface Activity {
+  title: string;
+  description: string;
+  domain: string;
+  requiresModeling: boolean;
+}
+
+interface DaySchedule {
+  day: string;
+  activities: Activity[];
+}
 
 export default function TeacherSchedule() {
   const [children, setChildren] = useState<any[]>([]);
   const [selectedChild, setSelectedChild] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [dailyCount, setDailyCount] = useState(0);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [fetchingSchedule, setFetchingSchedule] = useState(false);
+  const [weeklySchedule, setWeeklySchedule] = useState<DaySchedule[]>([]);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [activeTopic, setActiveTopic] = useState("");
   
   // Lesson Plan States
   const [activeLessonPlan, setActiveLessonPlan] = useState<string | null>(null);
   const [generatingPlan, setGeneratingPlan] = useState(false);
-  const [selectedItemForPlan, setSelectedItemForPlan] = useState<any>(null);
+  const [selectedActivityForPlan, setSelectedActivityForPlan] = useState<Activity | null>(null);
 
-  const TEACHER_ID = "GV_DUONG_01";
+  const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") || "GV_DUONG_01" : "GV_DUONG_01";
+  const userRole = typeof window !== 'undefined' ? localStorage.getItem("userRole") || "teacher" : "teacher";
 
-  // 1. Load KBC Children
+  // 1. Load Children
   useEffect(() => {
     async function loadChildren() {
       try {
-        const q = query(collection(db, "children"), where("teacherId", "==", TEACHER_ID));
+        const q = userRole === "admin"
+          ? query(collection(db, "children"))
+          : query(collection(db, "children"), where("teacherId", "==", userId));
+        
         const snap = await getDocs(q);
-        const list = snap.docs.filter(d => d.id.startsWith("KBC-")).map(doc => ({ id: doc.id, ...doc.data() }));
+        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setChildren(list);
         if (list.length > 0) setSelectedChild(list[0]);
       } catch (e) {
@@ -53,68 +60,90 @@ export default function TeacherSchedule() {
       }
     }
     loadChildren();
-  }, []);
+  }, [userId, userRole]);
 
-  // 2. Load Stats & Daily Count when child changes
+  // 2. Load Weekly Schedule when child changes
   useEffect(() => {
     if (!selectedChild) return;
-
-    async function loadChildContext() {
-      const count = await videoService.getDailyVideoCount(selectedChild.id);
-      setDailyCount(count);
-
-      const statsRef = doc(db, "hpdt_stats", selectedChild.id);
-      const statsSnap = await getDoc(statsRef);
-      
-      let recoList: any[] = [];
-      if (statsSnap.exists()) {
-        const dims = statsSnap.data().dimensions || {};
-        const sortedDims = Object.entries(dims).sort((a: any, b: any) => a[1] - b[1]);
-        
-        const primaryDomain = sortedDims[0][0];
-        const secondaryDomain = sortedDims[1]?.[0] || primaryDomain;
-        
-        const goals1 = DOMAIN_GOALS[primaryDomain] || DOMAIN_GOALS.social;
-        const goals2 = DOMAIN_GOALS[secondaryDomain] || DOMAIN_GOALS.communication;
-
-        recoList = [
-          { topic: goals1[0], domain: primaryDomain, priority: "High", stats: dims },
-          { topic: goals2[0], domain: secondaryDomain, priority: "Medium", stats: dims },
-          { topic: goals1[1], domain: primaryDomain, priority: "Low", stats: dims }
-        ];
-      } else {
-        recoList = [
-          { topic: "Chào hỏi giáo viên", domain: "social", priority: "High", stats: {} },
-          { topic: "Phát âm nguyên âm", domain: "communication", priority: "Medium", stats: {} },
-          { topic: "Ngồi yên tại chỗ", domain: "behavior", priority: "Low", stats: {} }
-        ];
-      }
-      setRecommendations(recoList);
-    }
-
-    loadChildContext();
+    loadWeeklySchedule(selectedChild.id, false);
   }, [selectedChild]);
 
-  const handleUploadClick = (topic: string) => {
-    if (dailyCount >= 3) {
-      alert("Bé đã đạt giới hạn 3 video modeling cho ngày hôm nay.");
-      return;
+  async function loadWeeklySchedule(childId: string, refresh: boolean) {
+    setFetchingSchedule(true);
+    try {
+      const scheduleRef = doc(db, "weekly_schedules", childId);
+      const snap = await getDoc(scheduleRef);
+      
+      if (snap.exists() && !refresh) {
+        setWeeklySchedule(snap.data().days || []);
+      } else {
+        const statsRef = doc(db, "hpdt_stats", childId);
+        const statsSnap = await getDoc(statsRef);
+        const stats = statsSnap.exists() 
+          ? JSON.parse(JSON.stringify(statsSnap.data())) 
+          : { hpdt: 70 };
+        
+        const aiResponse = await generateWeeklyScheduleAction(stats, selectedChild.name);
+        
+        let parsedSchedule: DaySchedule[] = [];
+        try {
+           const jsonMatch = aiResponse.match(/\[.*\]/s);
+           if (jsonMatch) {
+             parsedSchedule = JSON.parse(jsonMatch[0]);
+           } else {
+             // Fallback mock
+             parsedSchedule = generateMockSchedule();
+           }
+        } catch (e) {
+           console.error("AI parsing failed", e);
+           parsedSchedule = generateMockSchedule();
+        }
+
+        if (parsedSchedule.length > 0) {
+          await setDoc(scheduleRef, { 
+            days: parsedSchedule, 
+            updatedAt: new Date(),
+            childId: childId 
+          });
+          setWeeklySchedule(parsedSchedule);
+        }
+      }
+    } catch (e) {
+      console.error("Load schedule failed:", e);
+    } finally {
+      setFetchingSchedule(false);
     }
+  }
+
+  const handleUploadClick = (topic: string) => {
     setActiveTopic(topic);
     setIsUploadOpen(true);
   };
 
-  const generatePlan = async (item: any) => {
+  const showLessonPlan = async (activity: Activity) => {
     setGeneratingPlan(true);
-    setSelectedItemForPlan(item);
+    setSelectedActivityForPlan(activity);
     try {
-      const plan = await generateLessonPlanAction(item.stats, item.domain);
+      const plan = await generateLessonPlanAction({ hpdt: 70 }, activity.domain);
       setActiveLessonPlan(plan);
     } catch (e) {
-      setActiveLessonPlan("Không thể tạo giáo án lúc này. Vui lòng thử lại sau.");
+      setActiveLessonPlan("Không thể tạo giáo án lúc này.");
     } finally {
       setGeneratingPlan(false);
     }
+  };
+
+  const domainColors: Record<string, string> = {
+    "Giao tiếp": "bg-blue-50 text-blue-600 border-blue-100",
+    "Social": "bg-emerald-50 text-emerald-600 border-emerald-100",
+    "Xã hội": "bg-emerald-50 text-emerald-600 border-emerald-100",
+    "Hành vi": "bg-red-50 text-red-600 border-red-100",
+    "Behavior": "bg-red-50 text-red-600 border-red-100",
+    "Vận động": "bg-purple-50 text-purple-600 border-purple-100",
+    "Sensory": "bg-purple-50 text-purple-600 border-purple-100",
+    "Tự học": "bg-orange-50 text-orange-600 border-orange-100",
+    "Cognitive": "bg-orange-50 text-orange-600 border-orange-100",
+    "Tự phục vụ": "bg-amber-50 text-amber-600 border-amber-100",
   };
 
   if (loading) {
@@ -127,23 +156,28 @@ export default function TeacherSchedule() {
 
   return (
     <div className="p-8 space-y-10 bg-calming-bg min-h-screen pb-32">
-      <header className="flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-40 py-4 -mx-8 px-8">
+      <header className="flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-40 py-4 -mx-8 px-8 border-b border-white/50">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight text-gradient bg-clip-text text-transparent bg-gradient-to-r from-primary to-indigo-600">Lịch dạy & Đề xuất AI</h1>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Kế hoạch dậy & Lộ trình tuần</h1>
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">
-            Dựa trên điểm số {selectedChild?.name || "Bé"}
+            Phân tích AI cho {selectedChild?.name || "Bé"} • Thứ 2 - Chủ Nhật
           </p>
         </div>
-        <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100 text-primary">
-          <Calendar size={24} />
-        </div>
+        <button 
+          onClick={() => selectedChild && loadWeeklySchedule(selectedChild.id, true)}
+          disabled={fetchingSchedule}
+          className="flex items-center gap-2 bg-white text-primary px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-primary/10 shadow-sm hover:bg-primary/5 transition-all"
+        >
+          {fetchingSchedule ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Tạo lại lịch dạy (AI)
+        </button>
       </header>
 
       {/* Child Selection Bar */}
       <section className="space-y-4">
         <div className="flex items-center gap-2">
           <Users size={16} className="text-gray-400" />
-          <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Chọn trẻ để xem lộ trình cụ thể</h4>
+          <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Chọn trẻ để thay đổi giáo án cá nhân hóa</h4>
         </div>
         <div className="flex gap-4 overflow-x-auto pb-4 -mx-2 px-2 no-scrollbar">
           {children.map((child) => (
@@ -167,112 +201,74 @@ export default function TeacherSchedule() {
         </div>
       </section>
 
-      {/* Daily Progress & AI Suggestion */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <motion.div 
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="lg:col-span-2 bg-primary rounded-[40px] p-8 text-white shadow-hpdt relative overflow-hidden"
-        >
-          <div className="absolute top-[-20px] right-[-20px] opacity-10 pointer-events-none">
-            <Sparkles size={140} />
-          </div>
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <Star size={18} className="fill-white" />
-              <h3 className="text-[10px] font-black uppercase tracking-widest italic">Phân tích lộ trình thông minh</h3>
-            </div>
-            <div className="bg-white/20 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest">
-              Lượt hôm nay: {dailyCount}/3
-            </div>
-          </div>
-          <p className="text-lg font-black tracking-tight leading-relaxed italic mb-8">
-            "{selectedChild?.name} đang cần cải thiện kỹ năng ở miền <b>{recommendations[0]?.domain || "ưu tiên"}</b>. Hệ thống đã thiết lập 3 bài học đề xuất bên dưới để cô thực hiện."
-          </p>
-          <div className="h-2 bg-white/20 rounded-full overflow-hidden">
-             <motion.div 
-              initial={{ width: 0 }} 
-              animate={{ width: `${(dailyCount / 3) * 100}%` }}
-              className="h-full bg-white shadow-[0_0_15px_rgba(255,255,255,0.5)]" 
-             />
-          </div>
-        </motion.div>
-
-        <div className="bg-white rounded-[40px] p-8 border border-gray-50 shadow-soft flex flex-col justify-center items-center text-center space-y-4">
-           {dailyCount >= 3 ? (
-             <>
-               <CheckCircle size={48} className="text-emerald-500" />
-               <h4 className="text-xl font-black text-gray-900">Mục tiêu ngày đã xong!</h4>
-               <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Tuyệt vời, cô đã nạp đủ 3 video cho {selectedChild?.name}.</p>
-             </>
-           ) : (
-             <>
-               <Brain size={48} className="text-primary/20" />
-               <h4 className="text-xl font-black text-gray-900">Mục tiêu tiếp theo</h4>
-               <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Cô còn {3 - dailyCount} video cần quay hôm nay.</p>
-             </>
-           )}
+      {fetchingSchedule ? (
+        <div className="flex flex-col items-center justify-center py-24 space-y-6">
+           <Loader2 className="animate-spin text-primary" size={60} />
+           <p className="text-sm font-black text-gray-900 uppercase tracking-tighter italic">AI đang kiến tạo lộ trình 7 ngày...</p>
         </div>
-      </div>
-
-      {/* Dynamic Recommendation Cards */}
-      <section className="space-y-6">
-        <div className="flex items-center gap-3">
-          <BookOpen size={20} className="text-primary" />
-          <h3 className="text-xs font-black uppercase tracking-widest text-gray-900">Gợi ý bài tập Modeling dựa trên hpDT</h3>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {recommendations.map((item, idx) => (
-            <motion.div 
-              key={idx}
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: idx * 0.1 }}
-              className="bg-white rounded-[40px] p-8 border border-gray-50 shadow-soft hover:shadow-premium transition-all group relative overflow-hidden flex flex-col"
-            >
-              <div className="flex justify-between items-start mb-6">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${
-                      item.priority === 'High' ? 'bg-red-50 text-red-500' : 
-                      item.priority === 'Medium' ? 'bg-amber-50 text-amber-500' : 'bg-gray-50 text-gray-400'
-                    }`}>
-                      Ưu tiên: {item.priority}
-                    </span>
+      ) : (
+        <div className="space-y-12">
+          {weeklySchedule.map((day, dIdx) => (
+            <section key={dIdx} className="space-y-6">
+               <div className="flex items-center gap-6">
+                  <div className="bg-primary text-white w-20 h-20 rounded-[28px] flex flex-col items-center justify-center shadow-lg shadow-primary/20">
+                     <span className="text-[10px] font-black uppercase opacity-60">Day</span>
+                     <span className="text-2xl font-black">{dIdx + 1}</span>
                   </div>
-                  <h4 className="text-lg font-black text-gray-900 tracking-tight leading-tight pt-2">{item.topic}</h4>
-                </div>
-                <div className="p-3 bg-indigo-50 text-primary rounded-2xl group-hover:bg-primary group-hover:text-white transition-all">
-                  <Sparkles size={16} />
-                </div>
-              </div>
+                  <div>
+                     <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none">{day.day}</h3>
+                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5 italic">Lộ trình 3 bài tập chuẩn ABA • Tiết 1, 2, 3</p>
+                  </div>
+               </div>
 
-              <div className="space-y-3 mt-auto">
-                 <button 
-                  onClick={() => generatePlan(item)}
-                  className="w-full bg-white border-2 border-primary/10 hover:border-primary/40 py-4 rounded-2xl flex items-center justify-center gap-3 text-primary text-[10px] font-black uppercase tracking-widest transition-all"
-                 >
-                   <Wand2 size={18} /> Xem giáo án chuẩn
-                 </button>
-                 
-                 <button 
-                  onClick={() => handleUploadClick(item.topic)}
-                  disabled={dailyCount >= 3}
-                  className="w-full bg-primary text-white shadow-lg shadow-primary/20 py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all disabled:opacity-30 disabled:pointer-events-none"
-                 >
-                   <Upload size={18} /> Quay Video Modeling
-                 </button>
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {day.activities.map((activity, aIdx) => (
+                    <motion.div
+                      key={aIdx}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      transition={{ delay: aIdx * 0.1 }}
+                      className="bg-white rounded-[40px] p-8 border border-gray-50 shadow-soft hover:shadow-premium transition-all group flex flex-col relative"
+                    >
+                      <div className="flex justify-between items-start mb-6">
+                         <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${domainColors[activity.domain] || "bg-gray-50 text-gray-500"}`}>
+                            {activity.domain}
+                         </span>
+                         {activity.requiresModeling && (
+                           <div className="bg-yellow-50 text-yellow-600 p-2 rounded-xl" title="Yêu cầu Video Modeling">
+                              <Star size={14} className="fill-yellow-600" />
+                           </div>
+                         )}
+                      </div>
 
-                 <div className="flex items-center justify-between pt-6 border-t border-gray-50 text-[9px] font-black uppercase tracking-widest text-gray-400">
-                    <span className="flex items-center gap-2 italic">Lộ trình: {selectedChild?.name}</span>
-                    <span className="text-primary">{item.domain}</span>
-                 </div>
-              </div>
-            </motion.div>
+                      <h4 className="text-lg font-black text-gray-900 tracking-tight leading-snug mb-3">{activity.title}</h4>
+                      <p className="text-[11px] font-medium text-gray-500 leading-relaxed italic mb-8 flex-1">
+                         "{activity.description}"
+                      </p>
+
+                      <div className="space-y-3">
+                         <button 
+                            onClick={() => showLessonPlan(activity)}
+                            className="w-full bg-white border border-gray-100 text-gray-600 py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all"
+                         >
+                            <BookOpen size={16} /> Giáo án AI
+                         </button>
+                         {activity.requiresModeling && (
+                           <button 
+                              onClick={() => handleUploadClick(activity.title)}
+                              className="w-full bg-primary text-white py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.03] transition-all"
+                           >
+                              <Upload size={18} /> Quay Video Modeling
+                           </button>
+                         )}
+                      </div>
+                    </motion.div>
+                  ))}
+               </div>
+            </section>
           ))}
         </div>
-      </section>
+      )}
 
       {/* Lesson Plan Modal */}
       <AnimatePresence>
@@ -297,20 +293,17 @@ export default function TeacherSchedule() {
                  </button>
                  <div className="flex items-center gap-4 mb-4">
                     <Brain size={32} className="opacity-50" />
-                    <h3 className="text-[10px] font-black uppercase tracking-widest">AI Giáo án chuẩn (VST Specialist)</h3>
+                    <h3 className="text-[10px] font-black uppercase tracking-widest">AI Guide (VST Specialist)</h3>
                  </div>
-                 <h2 className="text-3xl font-black tracking-tight">{selectedItemForPlan?.topic}</h2>
-                 <p className="text-sm opacity-60 mt-2 font-bold uppercase tracking-widest italic">{selectedItemForPlan?.domain} • Ưu tiên {selectedItemForPlan?.priority}</p>
+                 <h2 className="text-3xl font-black tracking-tight">{selectedActivityForPlan?.title}</h2>
+                 <p className="text-sm opacity-60 mt-2 font-bold uppercase tracking-widest italic">{selectedActivityForPlan?.domain}</p>
               </div>
 
               <div className="p-10 max-h-[60vh] overflow-y-auto custom-scrollbar space-y-8">
                  {generatingPlan ? (
                     <div className="flex flex-col items-center justify-center py-20 space-y-6 text-center">
                        <Loader2 className="animate-spin text-primary" size={60} />
-                       <div>
-                          <h4 className="text-xl font-black text-gray-900 italic uppercase tracking-tighter">Đang kiến tạo giáo án...</h4>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2 px-12">AI đang phân tích hpDT để đưa ra các bước can thiệp tối ưu nhất.</p>
-                       </div>
+                       <h4 className="text-xl font-black text-gray-900 italic uppercase tracking-tighter">Đang kiến tạo giáo án chi tiết...</h4>
                     </div>
                  ) : (
                     <div className="prose prose-slate max-w-none text-gray-700 font-medium leading-relaxed whitespace-pre-line">
@@ -319,17 +312,21 @@ export default function TeacherSchedule() {
                  )}
               </div>
 
-              <div className="p-10 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-                 <div className="flex items-center gap-4">
-                    <Info size={20} className="text-gray-400" />
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest max-w-[200px]">Hãy thực hiện theo các bước trên khi quay video Modeling.</p>
-                 </div>
+              <div className="p-10 bg-gray-50 border-t border-gray-100 flex justify-end gap-4">
                  <button 
-                  onClick={() => { setActiveLessonPlan(null); handleUploadClick(selectedItemForPlan?.topic); }}
-                  className="bg-primary text-white px-8 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                  onClick={() => setActiveLessonPlan(null)}
+                  className="px-8 py-5 rounded-3xl font-black text-[10px] uppercase tracking-widest text-gray-400 hover:text-gray-600 transition-all"
                  >
-                    Bắt đầu Quay Video
+                    Đóng
                  </button>
+                 {selectedActivityForPlan?.requiresModeling && (
+                    <button 
+                      onClick={() => { setActiveLessonPlan(null); handleUploadClick(selectedActivityForPlan.title); }}
+                      className="bg-primary text-white px-8 py-5 rounded-3xl font-black text-[12px] uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                    >
+                      Quay Video Ngay
+                    </button>
+                 )}
               </div>
             </motion.div>
           </motion.div>
@@ -345,4 +342,16 @@ export default function TeacherSchedule() {
       />
     </div>
   );
+}
+
+function generateMockSchedule(): DaySchedule[] {
+  const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
+  return days.map(d => ({
+    day: d,
+    activities: [
+      { title: "Chào hỏi giáo viên", description: "Bé nhìn vào mắt cô và vẫy tay.", domain: "Xã hội", requiresModeling: true },
+      { title: "Sắp xếp khối màu", description: "Phân loại 3 màu cơ bản.", domain: "Cognitive", requiresModeling: false },
+      { title: "Dọn dẹp bàn học", description: "Cất bút vào hộp sau khi học.", domain: "Tự phục vụ", requiresModeling: true },
+    ]
+  }));
 }

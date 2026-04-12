@@ -8,9 +8,10 @@ interface ActivityItemProps {
   location: string;
   duration: string;
   isCompleted: boolean;
+  onUpload?: () => void;
 }
 
-export default function ActivityItem({ title, location, duration, isCompleted }: ActivityItemProps) {
+export default function ActivityItem({ title, location, duration, isCompleted, onUpload }: ActivityItemProps) {
   return (
     <motion.div 
       whileHover={{ scale: 1.02 }}

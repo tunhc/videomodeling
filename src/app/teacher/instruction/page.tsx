@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Send, MessageSquare, Sparkles, CheckCircle2, Bell, Loader2, Users, ChevronRight } from "lucide-react";
 import { sendInstruction } from "@/lib/services/taskService";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
 
 export default function InstructionPage() {
   const [message, setMessage] = useState("");
@@ -16,13 +16,23 @@ export default function InstructionPage() {
   const [selectedChild, setSelectedChild] = useState<any>(null);
   const [fetching, setFetching] = useState(true);
 
-  const TEACHER_ID = "GV_DUONG_01";
-  const TEACHER_NAME = "Cô Thùy Dương";
+  const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") || "GV_DUONG_01" : "GV_DUONG_01";
+  const [teacherName, setTeacherName] = useState("Giáo viên");
+
+  useEffect(() => {
+    async function loadIdentity() {
+      const docSnap = await getDoc(doc(db, "users", userId));
+      if (docSnap.exists()) {
+        setTeacherName(docSnap.data().displayName || "Giáo viên");
+      }
+    }
+    loadIdentity();
+  }, [userId]);
 
   useEffect(() => {
     async function loadChildren() {
       try {
-        const q = query(collection(db, "children"), where("teacherId", "==", TEACHER_ID));
+        const q = query(collection(db, "children"), where("teacherId", "==", userId));
         const snap = await getDocs(q);
         const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setChildren(list);
@@ -43,8 +53,8 @@ export default function InstructionPage() {
 
     try {
       await sendInstruction({
-        teacherId: TEACHER_ID,
-        teacherName: TEACHER_NAME,
+        teacherId: userId,
+        teacherName: teacherName,
         childId: selectedChild.id,
         parentId: selectedChild.parentId || "PH_DEFAULT",
         content: message.trim(),

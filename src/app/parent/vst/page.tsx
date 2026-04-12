@@ -32,7 +32,32 @@ export default function ParentVSTChat() {
   const [input, setInput] = useState("");
   const [isTeacherOnline, setIsTeacherOnline] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const userId = localStorage.getItem("userId");
+    if (!userId) return;
+
+    async function loadContext() {
+      const snap = await getDoc(doc(db, "users", userId));
+      if (snap.exists()) {
+        const data = snap.data();
+        setUserProfile(data);
+        
+        // Initial Message upgrade
+        setMessages([
+          {
+            id: "1",
+            text: `Chào Anh/Chị! Tôi là Cô Dương, trợ lý VST của bé ${data.displayName?.split(' ').pop() || "Minh Khôi"}. Tôi đã sẵn sàng hỗ trợ Anh/Chị về lộ trình can thiệp của bé.`,
+            sender: "vst",
+            timestamp: new Date()
+          }
+        ]);
+      }
+    }
+    loadContext();
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -71,9 +96,9 @@ export default function ParentVSTChat() {
       } else {
         // Real AI Auto-Reply
         const aiResponse = await askVST(textToSend, { 
-          childName: "Minh Khôi", 
-          hpdtOverall: "78%",
-          recentActivity: "Video Modeling Giao tiếp mắt" 
+          childName: userProfile?.displayName || "Bé", 
+          hpdtOverall: `${userProfile?.hpdt || 75}%`,
+          recentActivity: "Video Modeling Giao tiếp" 
         });
         
         const resp: Message = {
