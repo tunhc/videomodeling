@@ -17,6 +17,7 @@ export default function InstructionPage() {
   const [fetching, setFetching] = useState(true);
 
   const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") || "GV_DUONG_01" : "GV_DUONG_01";
+  const userRole = typeof window !== 'undefined' ? localStorage.getItem("userRole") || "teacher" : "teacher";
   const [teacherName, setTeacherName] = useState("Giáo viên");
 
   useEffect(() => {
@@ -32,7 +33,10 @@ export default function InstructionPage() {
   useEffect(() => {
     async function loadChildren() {
       try {
-        const q = query(collection(db, "children"), where("teacherId", "==", userId));
+        const q = userRole === "admin"
+          ? query(collection(db, "children"))
+          : query(collection(db, "children"), where("teacherId", "==", userId));
+        
         const snap = await getDocs(q);
         const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setChildren(list);
@@ -44,7 +48,7 @@ export default function InstructionPage() {
       }
     }
     loadChildren();
-  }, []);
+  }, [userId, userRole]);
 
   const handleSend = async () => {
     if (!message.trim() || !selectedChild) return;
