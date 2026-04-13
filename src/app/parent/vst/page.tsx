@@ -42,7 +42,7 @@ export default function ParentVSTChat() {
     if (!userId) return;
 
     async function loadContext() {
-      const snap = await getDoc(doc(db, "users", userId));
+      const snap = await getDoc(doc(db, "users", userId as string));
       if (snap.exists()) {
         const data = snap.data();
         setUserProfile(data);

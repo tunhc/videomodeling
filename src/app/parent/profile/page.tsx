@@ -20,13 +20,13 @@ export default function ProfilePage() {
 
     async function loadProfile() {
       try {
-        const userSnap = await getDoc(doc(db, "users", userId));
+        const userSnap = await getDoc(doc(db, "users", userId as string));
         if (userSnap.exists()) {
           const userData = userSnap.data();
           setUserProfile(userData);
 
-          const childId = userData.childId || userId.replace("PH_", "");
-          const childSnap = await getDoc(doc(db, "children", childId));
+          const childId = userData.childId || (userId as string).replace("PH_", "");
+          const childSnap = await getDoc(doc(db, "children", childId as string));
           if (childSnap.exists()) {
             setChildData({ id: childSnap.id, ...childSnap.data() });
           }

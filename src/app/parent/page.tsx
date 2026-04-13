@@ -51,7 +51,7 @@ export default function ParentHome() {
       try {
         const docRef = doc(db, "users", userId as string);
         const snap = await getDoc(docRef);
-        let profile = null;
+        let profile: any = null;
         
         if (snap.exists()) {
           profile = { id: snap.id, role: userRole, ...snap.data() };
@@ -61,7 +61,7 @@ export default function ParentHome() {
         setUserProfile(profile);
 
         // Fetch Schedule
-        if (profile.childId) {
+        if (profile && profile.childId) {
           const scheduleRef = doc(db, "weekly_schedules", profile.childId);
           const scheduleSnap = await getDoc(scheduleRef);
           if (scheduleSnap.exists()) {
@@ -131,7 +131,7 @@ export default function ParentHome() {
       // 3. Parse JSON
       let parsedDays: any[] = [];
       try {
-        const jsonMatch = aiResponse.match(/\[.*\]/s);
+        const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           parsedDays = JSON.parse(jsonMatch[0]);
         }

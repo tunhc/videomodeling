@@ -87,7 +87,7 @@ export default function TeacherSchedule() {
         
         let parsedSchedule: DaySchedule[] = [];
         try {
-           const jsonMatch = aiResponse.match(/\[.*\]/s);
+           const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
            if (jsonMatch) {
              parsedSchedule = JSON.parse(jsonMatch[0]);
            } else {
