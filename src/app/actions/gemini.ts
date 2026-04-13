@@ -44,3 +44,16 @@ export async function generateWeeklyScheduleAction(childStats: any, childName: s
 
   return await getGeminiResponse(prompt, childStats, "pediatric-intervention-coach");
 }
+
+export async function generateDailyScheduleAction(childStats: any, childName: string) {
+  const prompt = `Hãy thiết kế một "Lộ trình hôm nay" (Daily Roadmap) cho bé ${childName} chuẩn ABA/VB. 
+  Dữ liệu hiện tại: ${JSON.stringify(childStats)}.
+  
+  Yêu cầu:
+  1. Đề xuất đúng 3 bài học (Sáng, Trưa, Chiều).
+  2. Mỗi bài tập cần có: title, description, domain, và requiresModeling (true nếu cần dùng video mẫu).
+  3. Trả về ĐỊNH DẠNG JSON array duy nhất: [{ title, description, domain, requiresModeling }].
+  4. Trả lời bằng tiếng Việt, súc tích.`;
+
+  return await getGeminiResponse(prompt, childStats, "pediatric-intervention-coach");
+}

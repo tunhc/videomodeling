@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Play, ChevronRight, Video, CheckCircle2, Zap, Camera, MessageCircle, X, Loader2, Trash2, Calendar, Star } from "lucide-react";
+import { Bell, Play, ChevronRight, Video, CheckCircle2, Zap, Camera, MessageCircle, X, Loader2, Trash2, Calendar, Star, RefreshCw, Sparkles } from "lucide-react";
 import HPDTBrainCard from "@/components/hpdt/HPDTBrainCard";
 import ActivityItem from "@/components/parent/ActivityItem";
 import VideoUploadModal from "@/components/VideoUploadModal";
@@ -10,7 +10,8 @@ import UserMenu from "@/components/layout/UserMenu";
 import { subscribeToTasks, acknowledgeTask, CollaborationTask } from "@/lib/services/taskService";
 import { videoService } from "@/lib/services/videoService";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { generateDailyScheduleAction } from "@/app/actions/gemini";
 
 interface Activity {
   title: string;
@@ -32,6 +33,7 @@ export default function ParentHome() {
 
   const [todayActivities, setTodayActivities] = useState<Activity[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [generatingDaily, setGeneratingDaily] = useState(false);
   const [activeUploadTopic, setActiveUploadTopic] = useState("");
 
   // 1. Load User Profile
@@ -116,6 +118,65 @@ export default function ParentHome() {
     }
     loadChildVideos();
   }, [userProfile]);
+
+  const handleGenerateDailyAI = async () => {
+    if (!userProfile?.childId) return;
+    setGeneratingDaily(true);
+    try {
+      // 1. Get Child Stats for AI context
+      const statsRef = doc(db, "hpdt_stats", userProfile.childId);
+      const statsSnap = await getDoc(statsRef);
+      const stats = statsSnap.exists() ? statsSnap.data() : { hpdt: userProfile.hpdt || 75 };
+      
+      // 2. Call AI
+      const aiResponse = await generateDailyScheduleAction(stats, userProfile.displayName || "Bé");
+      
+      // 3. Parse JSON
+      let activities: Activity[] = [];
+      try {
+        const jsonMatch = aiResponse.match(/\[.*\]/s);
+        if (jsonMatch) {
+          activities = JSON.parse(jsonMatch[0]);
+        }
+      } catch (e) {
+        console.error("AI Parse failed:", e);
+      }
+
+      if (activities.length > 0) {
+        // 4. Update weekly_schedules specifically for today
+        const scheduleRef = doc(db, "weekly_schedules", userProfile.childId);
+        const scheduleSnap = await getDoc(scheduleRef);
+        
+        const daysMap = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+        const todayStr = daysMap[new Date().getDay()];
+        
+        if (scheduleSnap.exists()) {
+          const existingDays = scheduleSnap.data().days || [];
+          const dayIdx = existingDays.findIndex((d: any) => d.day === todayStr);
+          
+          if (dayIdx >= 0) {
+            existingDays[dayIdx].activities = activities;
+          } else {
+            existingDays.push({ day: todayStr, activities: activities });
+          }
+          await updateDoc(scheduleRef, { days: existingDays });
+        } else {
+          await setDoc(scheduleRef, {
+            childId: userProfile.childId,
+            days: [{ day: todayStr, activities: activities }],
+            updatedAt: new Date()
+          });
+        }
+        
+        setTodayActivities(activities);
+      }
+    } catch (e) {
+      console.error("Generate daily failed:", e);
+      alert("Không thể tạo lộ trình lúc này. Vui lòng thử lại sau.");
+    } finally {
+      setGeneratingDaily(false);
+    }
+  };
 
   const handleDeleteVideo = async (vidId: string, createdAt: any) => {
     if (!confirm("Bạn có chắc chắn muốn xóa video này?")) return;
@@ -285,20 +346,43 @@ export default function ParentHome() {
             {loadingSchedule ? (
                <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-primary" size={24} /></div>
             ) : todayActivities.length > 0 ? (
-              todayActivities.map((item, idx) => (
-                <ActivityItem 
-                  key={idx} 
-                  title={item.title} 
-                  location={item.requiresModeling ? "Yêu cầu Video" : "Xem giáo án"} 
-                  duration={item.domain} 
-                  isCompleted={false}
-                  onUpload={item.requiresModeling ? () => startUpload(item.title) : undefined}
-                />
-              ))
+               <div className="space-y-4">
+                {todayActivities.map((item, idx) => (
+                  <ActivityItem 
+                    key={idx} 
+                    title={item.title} 
+                    location={item.requiresModeling ? "Yêu cầu Video" : "Xem giáo án"} 
+                    duration={item.domain} 
+                    isCompleted={false}
+                    onUpload={item.requiresModeling ? () => startUpload(item.title) : undefined}
+                  />
+                ))}
+                <button 
+                  onClick={handleGenerateDailyAI}
+                  disabled={generatingDaily}
+                  className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-primary/20 rounded-[28px] text-[10px] font-black uppercase tracking-widest text-primary/60 hover:text-primary hover:border-primary/40 transition-all"
+                >
+                  {generatingDaily ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Cập nhật lộ trình AI mới
+                </button>
+               </div>
             ) : (
-              <div className="bg-gray-50 rounded-[40px] p-10 text-center border-2 border-dashed border-gray-100">
-                 <Calendar size={32} className="text-gray-200 mx-auto mb-4" />
-                 <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">Chưa có lịch dạy từ giáo viên tuần này.</p>
+              <div className="bg-white rounded-[40px] p-10 text-center border-2 border-dashed border-gray-100 space-y-6">
+                 <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto">
+                    <Calendar size={32} className="text-gray-200" />
+                 </div>
+                 <div className="space-y-2">
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest leading-none">Chưa có lịch dạy hôm nay</p>
+                    <p className="text-[10px] text-gray-300 font-medium italic">Bạn có muốn AI cá nhân hóa lộ trình 3 bài tập cho bé không?</p>
+                 </div>
+                 <button 
+                    onClick={handleGenerateDailyAI}
+                    disabled={generatingDaily}
+                    className="bg-primary text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 mx-auto"
+                 >
+                    {generatingDaily ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} fill="currentColor" />}
+                    Tạo lộ trình hôm nay (AI)
+                 </button>
               </div>
             )}
           </div>
