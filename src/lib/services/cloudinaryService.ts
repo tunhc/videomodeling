@@ -98,6 +98,21 @@ export const cloudinaryService = {
     } catch {
       return obfuscatedUrl;
     }
+  },
+
+  /**
+   * Extract the public_id from a Cloudinary URL to use as a display title
+   * Example: .../folder/parent_KBC-HCM_Long_B01_2026041310.mp4 -> parent_KBC-HCM_Long_B01_2026041310
+   */
+  extractPublicIdFromUrl(url: string) {
+    if (!url) return "Video";
+    try {
+      const parts = url.split("/");
+      const filenameWithExt = parts[parts.length - 1];
+      return filenameWithExt.split(".")[0] || "Video";
+    } catch {
+      return "Video";
+    }
   }
 };
 

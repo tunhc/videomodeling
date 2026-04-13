@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { collection, query, orderBy, getDocs } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { videoService } from "@/lib/services/videoService";
+import { cloudinaryService } from "@/lib/services/cloudinaryService";
 
 export default function TeacherHub() {
   const router = useRouter();
@@ -36,7 +37,7 @@ export default function TeacherHub() {
 
         const formattedList = list.map(vid => ({
           ...vid,
-          title: vid.topic || "Video phân tích",
+          title: cloudinaryService.extractPublicIdFromUrl(vid.url),
           sender: vid.senderId || "Hệ thống",
           date: new Date(vid.createdAt?.toDate() || Date.now()).toLocaleString("vi-VN"),
           type: vid.context === "school" ? "School" : "Home"
@@ -104,7 +105,7 @@ export default function TeacherHub() {
                   key={vid.id}
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="bg-white rounded-[40px] p-8 border border-gray-50 shadow-soft hover:shadow-premium transition-all group flex items-center gap-8 cursor-pointer relative"
+                  className="bg-white rounded-[24px] sm:rounded-[40px] p-4 sm:p-8 border border-gray-50 shadow-soft hover:shadow-premium transition-all group flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8 cursor-pointer relative"
                 >
                   <div 
                     onClick={() => router.push(`/teacher/analyze?id=${vid.id}`)}
@@ -122,7 +123,7 @@ export default function TeacherHub() {
                   
                   <div 
                     onClick={() => router.push(`/teacher/analyze?id=${vid.id}`)}
-                    className="flex-1 space-y-2"
+                    className="flex-1 space-y-2 w-full min-w-0"
                   >
                     <div className="flex items-center gap-2">
                       <span className={`text-[8px] font-black px-3 py-1 rounded-full uppercase tracking-widest ${vid.type === 'Home' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -130,7 +131,7 @@ export default function TeacherHub() {
                       </span>
                       <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest italic">{vid.date}</span>
                     </div>
-                    <h4 className="text-lg font-black text-gray-900 tracking-tight leading-tight">{vid.title}</h4>
+                    <h4 className="text-base sm:text-lg font-black text-gray-900 tracking-tight leading-tight line-clamp-2 sm:line-clamp-1">{vid.title}</h4>
                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest italic">
                       {getChildName(vid.childId)} • {vid.role === 'teacher' ? 'Giáo viên' : 'Phụ huynh'}
                     </p>

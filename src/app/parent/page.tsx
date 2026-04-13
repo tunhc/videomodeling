@@ -8,10 +8,9 @@ import ActivityItem from "@/components/parent/ActivityItem";
 import VideoUploadModal from "@/components/VideoUploadModal";
 import UserMenu from "@/components/layout/UserMenu";
 import { subscribeToTasks, acknowledgeTask, CollaborationTask } from "@/lib/services/taskService";
-import { videoService } from "@/lib/services/videoService";
-import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { generateWeeklyScheduleAction } from "@/app/actions/gemini";
+import { cloudinaryService } from "@/lib/services/cloudinaryService";
 
 interface Activity {
   title: string;
@@ -96,7 +95,7 @@ export default function ParentHome() {
 
           return {
             id: v.id,
-            title: v.topic || "Hoạt động Video Modeling",
+            title: cloudinaryService.extractPublicIdFromUrl(v.url),
             location: v.context === "school" ? "Tại Trường" : "Tại Nhà",
             time: v.createdAt?.toDate ? v.createdAt.toDate().toLocaleString("vi-VN") : "Gần đây",
             accuracy: v.status === "Đã phân tích" ? (v.hpdtAverages?.overall || 85) : 0,
@@ -357,7 +356,7 @@ export default function ParentHome() {
                 const isToday = day.day === daysMap[new Date().getDay()];
                 
                 return (
-                  <div key={dIdx} className={`space-y-6 ${isToday ? 'bg-primary/5 -mx-4 px-4 py-8 rounded-[40px] border border-primary/10 shadow-sm ring-4 ring-primary/5' : ''}`}>
+                  <div key={dIdx} className={`space-y-6 ${isToday ? 'bg-primary/5 -mx-4 sm:mx-0 px-4 sm:px-8 py-8 rounded-[32px] sm:rounded-[40px] border border-primary/10 shadow-sm ring-4 ring-primary/5' : ''}`}>
                     <div className="flex items-center gap-4">
                       <div className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center font-black ${isToday ? 'bg-primary text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100 shadow-sm'}`}>
                         <span className="text-[8px] uppercase tracking-tighter opacity-70">Thứ</span>
