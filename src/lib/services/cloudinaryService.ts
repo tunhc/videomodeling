@@ -39,46 +39,80 @@ export const cloudinaryService = {
     formData.append("public_id", `${roleCapitalized}_${childIdClean}_${locationSlug}-${dateStr}${indexStr}`);
     formData.append("tags", `${childIdClean},${centerNameClean},${roleCapitalized},vst-auto-upload`);
 
-    return new Promise<{ url: string; publicId: string; secureUrl: string }>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`);
+    const chunkSize = 5 * 1024 * 1024; // 5MB chunks
+    const totalSize = file.size;
+    const uniqueUploadId = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    
+    let start = 0;
+    let lastResponse: any = null;
 
-      if (abortController) {
-        abortController.signal.addEventListener("abort", () => {
-          xhr.abort();
-          reject(new Error("Upload canceled"));
-        });
-      }
+    while (start < totalSize) {
+      const end = Math.min(start + chunkSize, totalSize);
+      const chunk = file.slice(start, end);
+      
+      const chunkFormData = new FormData();
+      // Copy metadata once (usually only need preset for subsequent chunks, but safe to include)
+      chunkFormData.append("file", chunk);
+      chunkFormData.append("upload_preset", uploadPreset);
+      chunkFormData.append("folder", `AI4Autism/${centerNameClean}/Children/${childIdClean}`);
+      chunkFormData.append("public_id", `${roleCapitalized}_${childIdClean}_${locationSlug}-${dateStr}${indexStr}`);
+      chunkFormData.append("tags", `${childIdClean},${centerNameClean},${roleCapitalized},vst-auto-upload`);
 
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          const progress = (event.loaded / event.total) * 100;
-          onProgress(progress);
-        }
-      };
+      const result = await new Promise<any>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`);
+        
+        xhr.setRequestHeader("X-Unique-Upload-Id", uniqueUploadId);
+        xhr.setRequestHeader("Content-Range", `bytes ${start}-${end - 1}/${totalSize}`);
 
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const response = JSON.parse(xhr.responseText);
-          resolve({
-            url: response.url,
-            publicId: response.public_id,
-            secureUrl: response.secure_url,
+        if (abortController) {
+          abortController.signal.addEventListener("abort", () => {
+            xhr.abort();
+            reject(new Error("Upload canceled"));
           });
-        } else {
-          try {
-            const errorRes = JSON.parse(xhr.responseText);
-            console.error("Cloudinary Detailed Error:", errorRes);
-            reject(new Error(`Cloudinary upload failed: ${errorRes.error?.message || xhr.statusText}`));
-          } catch (e) {
-            reject(new Error(`Cloudinary upload failed: ${xhr.statusText}`));
-          }
         }
-      };
 
-      xhr.onerror = () => reject(new Error("Network error during Cloudinary upload"));
-      xhr.send(formData);
-    });
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && onProgress) {
+            // progress = (bytes previously uploaded + bytes currently uploading) / total
+            const progress = ((start + event.loaded) / totalSize) * 100;
+            onProgress(Math.min(progress, 99.9)); // Keep at 99.9 until last chunk resolves
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const response = JSON.parse(xhr.responseText);
+            resolve(response);
+          } else {
+            try {
+              const errorRes = JSON.parse(xhr.responseText);
+              reject(new Error(`Cloudinary chunk upload failed: ${errorRes.error?.message || xhr.statusText}`));
+            } catch (e) {
+              reject(new Error(`Cloudinary chunk upload failed: ${xhr.statusText}`));
+            }
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Network error during Cloudinary upload"));
+        xhr.send(chunkFormData);
+      });
+
+      lastResponse = result;
+      start = end;
+      
+      if (onProgress) {
+        onProgress((start / totalSize) * 100);
+      }
+    }
+
+    if (!lastResponse) throw new Error("Upload failed: No response from Cloudinary");
+
+    return {
+      url: lastResponse.url,
+      publicId: lastResponse.public_id,
+      secureUrl: lastResponse.secure_url,
+    };
   },
 
   /**
