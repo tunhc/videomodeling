@@ -156,6 +156,10 @@ export default function LoginPage() {
             )}
           </button>
         </form>
+
+        <p className="mt-4 text-center text-[11px] text-gray-500 font-semibold">
+          Tài khoản Phụ huynh/Giáo viên sẽ đồng bộ mật khẩu theo lần đăng nhập gần nhất.
+        </p>
         
         <div className="mt-8 text-center text-xs text-gray-400 uppercase tracking-widest">
           Empathic Infrastructure
