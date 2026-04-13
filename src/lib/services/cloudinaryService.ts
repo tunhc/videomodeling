@@ -23,8 +23,11 @@ export const cloudinaryService = {
     formData.append("upload_preset", uploadPreset);
     
     // Dynamic folder structure and tagging based on child info
+    const timestamp = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 12);
+    const role = metadata.role || "unknown";
+    
     formData.append("folder", `AI4Autism/${metadata.centerName}/Children/${metadata.childId}`);
-    formData.append("public_id", `${metadata.childId}_${Date.now()}`);
+    formData.append("public_id", `${role}_${metadata.childId}_${timestamp}`);
     formData.append("tags", `${metadata.childId},${metadata.centerName}${metadata.role ? ',' + metadata.role : ''},vst-auto-upload`);
 
     return new Promise<{ url: string; publicId: string; secureUrl: string }>((resolve, reject) => {
