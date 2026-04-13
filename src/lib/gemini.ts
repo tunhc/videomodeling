@@ -7,7 +7,7 @@ const genAI = new GoogleGenerativeAI(apiKey);
 
 export const getGeminiResponse = async (prompt: string, context?: any, skillName: string = "pediatric-intervention-coach") => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Load Skill context
     let skillContext = "";
