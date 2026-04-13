@@ -2,13 +2,18 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getAuthSession, routeForSession } from "@/lib/auth-session";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    // Force redirect to login from root to avoid stale session confusion
-    router.replace("/login");
+    const session = getAuthSession();
+    if (!session) {
+      router.replace("/login");
+      return;
+    }
+    router.replace(routeForSession(session));
   }, [router]);
 
   return (

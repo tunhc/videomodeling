@@ -27,10 +27,16 @@ export default function VideoUploadModal({
   initialCategory 
 }: VideoUploadModalProps) {
   const router = useRouter();
+  const configuredMaxUploadMb = Number(process.env.NEXT_PUBLIC_CLOUDINARY_MAX_FILE_SIZE_MB || "100");
+  const maxUploadMb = Number.isFinite(configuredMaxUploadMb) && configuredMaxUploadMb > 0
+    ? configuredMaxUploadMb
+    : 100;
+  const maxUploadBytes = Math.floor(maxUploadMb * 1024 * 1024);
   const [step, setStep] = useState<"upload" | "processing" | "labeling" | "context" | "success">("upload");
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [location, setLocation] = useState<string | null>(null);
   const [video, setVideo] = useState<File | null>(null);
+  const [uploadError, setUploadError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -39,6 +45,20 @@ export default function VideoUploadModal({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setUploadError("");
+
+      if (file.size > maxUploadBytes) {
+        const currentSizeMb = (file.size / (1024 * 1024)).toFixed(1);
+        setVideo(null);
+        setStep("upload");
+        e.target.value = "";
+        setUploadError(
+          `Video ${currentSizeMb}MB vượt giới hạn gói Cloudinary hiện tại (${maxUploadMb}MB). ` +
+            "Vui lòng cắt ngắn video, nén xuống 720p hoặc chia thành nhiều clip nhỏ."
+        );
+        return;
+      }
+
       setVideo(file);
       setStep("labeling");
     }
@@ -63,6 +83,7 @@ export default function VideoUploadModal({
     
     setStep("processing"); 
     setUploadProgress(0);
+    setUploadError("");
     abortControllerRef.current = new AbortController();
     
     try {
@@ -186,11 +207,20 @@ export default function VideoUploadModal({
         }
       }, 1500);
     } catch (error: any) {
-      if (error.message === "Upload canceled") {
+      const message = typeof error?.message === "string" ? error.message : "Không xác định";
+      if (message === "Upload canceled") {
         console.log("Upload canceled by user");
       } else {
         console.error("Upload failed:", error);
-        alert("Lỗi tải lên: " + error.message);
+        if (message.toLowerCase().includes("file size too large")) {
+          setUploadError(
+            `Cloudinary giới hạn tối đa ${maxUploadMb}MB cho mỗi file ở gói hiện tại. ` +
+              "Vui lòng giảm dung lượng hoặc tách clip trước khi tải lên."
+          );
+        } else {
+          setUploadError(`Tải lên thất bại: ${message}`);
+        }
+        alert("Lỗi tải lên: " + message);
         setStep("upload");
       }
     }
@@ -201,6 +231,7 @@ export default function VideoUploadModal({
     setVideo(null);
     setSelectedEmotions([]);
     setLocation(null);
+    setUploadError("");
     setUploadProgress(0);
     abortControllerRef.current = null;
   };
@@ -231,6 +262,7 @@ export default function VideoUploadModal({
               <div className="space-y-2">
                 <h2 className="text-3xl font-black text-gray-900 tracking-tight">Tải Video Lên</h2>
                 <p className="text-sm text-gray-500 font-medium tracking-tight">Lưu trữ hành trình Video Modeling của bé (Cloudinary Storage).</p>
+                <p className="text-xs text-amber-600 font-bold">Giới hạn hiện tại: tối đa {maxUploadMb}MB mỗi video.</p>
               </div>
               
               <label 
@@ -246,6 +278,12 @@ export default function VideoUploadModal({
                   <p className="text-[10px] text-indigo-300 font-black uppercase tracking-[0.3em] mt-2 italic">An toàn • Tốc độ Cloudinary</p>
                 </div>
               </label>
+
+              {uploadError ? (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold leading-relaxed">
+                  {uploadError}
+                </div>
+              ) : null}
 
               <div className="flex items-center gap-4 bg-blue-50/50 p-6 rounded-3xl border border-blue-100/50">
                 <Sparkles size={24} className="text-blue-500" />

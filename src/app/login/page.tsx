@@ -1,59 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, Lock, User, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { getAuthSession, routeForRole, routeForSession, setAuthSession } from "@/lib/auth-session";
+import { loginWithUserIdPassword } from "@/lib/services/authService";
 
 export default function LoginPage() {
   const [center, setCenter] = useState("Kim Bình Center");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberLogin, setRememberLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    const session = getAuthSession();
+    if (!session) return;
+    router.replace(routeForSession(session));
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Simulate login logic (real logic would query the seeded 'users' collection)
-    // For this mockup, we'll check the role based on ID prefix or a dummy lookup
-    setTimeout(() => {
-      if (!username || !password) {
-        setError("Vui lòng nhập đầy đủ thông tin");
-        setLoading(false);
-        return;
-      }
-
-      const isAdmin = username === "PH_admin" || username === "GV_admin";
-      
-      if (isAdmin) {
-        if (password !== "admin$$$") {
-          setError("Mật khẩu admin không chính xác");
-          setLoading(false);
-          return;
-        }
-        const role = "admin";
-        localStorage.setItem("userRole", role);
-        localStorage.setItem("userId", username);
-        router.push(username.startsWith("PH_") ? "/parent" : "/teacher");
-      } else if (username.startsWith("PH_") && username.length > 3) {
-        // Mock Parent Login for valid IDs
-        localStorage.setItem("userRole", "parent");
-        localStorage.setItem("userId", username);
-        router.push("/parent");
-      } else if (username.startsWith("GV_") && username.length > 3) {
-        // Mock Teacher Login for valid IDs
-        localStorage.setItem("userRole", "teacher");
-        localStorage.setItem("userId", username);
-        router.push("/teacher");
-      } else {
-        setError("ID hoặc Mật khẩu không đúng");
-      }
+    if (!username || !password) {
+      setError("Vui lòng nhập đầy đủ thông tin");
       setLoading(false);
-    }, 1000);
+      return;
+    }
+
+    try {
+      const authResult = await loginWithUserIdPassword({
+        userId: username,
+        password,
+      });
+
+      const fallbackPath = routeForRole(authResult.role);
+      const targetPath = authResult.homePath || fallbackPath;
+
+      setAuthSession({
+        userRole: authResult.role,
+        userId: authResult.userId,
+        remember: rememberLogin,
+        homePath: targetPath,
+      });
+
+      router.push(targetPath);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Đăng nhập thất bại";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -124,6 +126,16 @@ export default function LoginPage() {
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-2 text-xs font-bold text-gray-500 ml-1 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberLogin}
+              onChange={(e) => setRememberLogin(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/30"
+            />
+            Ghi nhớ đăng nhập (30 ngày)
+          </label>
 
           {error && (
             <p className="text-red-500 text-sm text-center bg-red-50 py-2 rounded-lg">{error}</p>

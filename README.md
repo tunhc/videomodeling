@@ -1,36 +1,84 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI4Autism Video Modeling
 
-## Getting Started
+Production-focused Next.js application for autism intervention workflows:
 
-First, run the development server:
+- Parent/Teacher role flows
+- Video upload + metadata tagging
+- Firestore-based data model
+- AI assistance via Gemini server actions
+
+## Runtime Baseline
+
+- Node.js: 22.x
+- Package manager: npm (lockfile-based install)
+- Framework: Next.js 16
+
+## Project Structure
+
+- App Router root: `src/app`
+- Main page entry: `src/app/page.tsx`
+- Core services: `src/lib/services`
+
+## Setup
+
+1. Install dependencies
+
+```bash
+npm ci
+```
+
+2. Create environment file
+
+```bash
+cp .env.example .env
+```
+
+3. Fill real values in `.env`
+
+4. Start development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment Variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Required keys:
 
-## Learn More
+- `NEXT_PUBLIC_FIREBASE_API_KEY`
+- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `GOOGLE_GEMINI_API_KEY`
+- `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`
+- `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`
 
-To learn more about Next.js, take a look at the following resources:
+Optional keys:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
+- `NEXT_PUBLIC_CLOUDINARY_MAX_FILE_SIZE_MB` (default `100`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Verify Before Merge
 
-## Deploy on Vercel
+Run these commands locally and keep logs when debugging CI/runtime issues:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run lint
+npm run build
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Expected outcome:
+
+- `npm run lint` exits 0
+- `npm run build` exits 0
+
+## Production Notes
+
+- Do not commit real `.env` values.
+- Keep service credentials outside source control.
+- Validate Cloudinary upload preset restrictions (size/type/rate limit) before production release.
+- Treat all AI responses as untrusted text and validate output shape before storing or rendering.
