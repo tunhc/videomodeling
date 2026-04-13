@@ -29,7 +29,7 @@ export default function VideoUploadModal({
   const router = useRouter();
   const [step, setStep] = useState<"upload" | "processing" | "labeling" | "context" | "success">("upload");
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
-  const [context, setContext] = useState<"Home" | "School" | null>(null);
+  const [location, setLocation] = useState<string | null>(null);
   const [video, setVideo] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -53,12 +53,12 @@ export default function VideoUploadModal({
     setUploadProgress(0);
   };
 
-  const handleContextSelect = (ctx: "Home" | "School") => {
-    setContext(ctx);
-    handleFinish(ctx);
+  const handleLocationSelect = (loc: string | null) => {
+    setLocation(loc);
+    handleFinish(loc);
   };
 
-  const handleFinish = async (currentContext: "Home" | "School") => {
+  const handleFinish = async (selectedLocation: string | null) => {
     if (!video) return;
     
     setStep("processing"); 
@@ -109,7 +109,12 @@ export default function VideoUploadModal({
           const childSnap = await getDoc(doc(db, "children", activeChildId));
           if (childSnap.exists()) {
             const data = childSnap.data();
-            centerCode = data.schoolCode || "KBC";
+            // If schoolCode is just "KBC", try to get more specific code from ID (e.g., KBC-HCM)
+            let sc = data.schoolCode || "KBC";
+            if (sc === "KBC" && activeChildId.includes("_")) {
+              sc = activeChildId.split("_")[0];
+            }
+            centerCode = sc;
             childName = data.name || "";
           }
         } catch (e) {
@@ -124,10 +129,27 @@ export default function VideoUploadModal({
       const defaultName = childName ? `${childName} - ${timestamp}` : video.name;
       const finalTopic = initialTopic || defaultName;
 
-      // 2. Upload to Cloudinary with metadata for organization
+      // 2. Upload to Cloudinary with standardized naming
+      const locationMapping: any = {
+        "Tại nhà": "home",
+        "Tại trường": "school",
+        "Công cộng": "public",
+        "Khác": "other"
+      };
+      const locationSlug = selectedLocation ? locationMapping[selectedLocation] : "unspecified";
+
+      // 2b. Get daily count for correct indexing (e.g., -01, -02)
+      const dailyCount = await videoService.getDailyVideoCount(uploadChildId);
+
       const cloudinaryResult = await cloudinaryService.uploadVideo(
         video,
-        { childId: uploadChildId, centerName: centerCode, role: role },
+        { 
+          childId: uploadChildId, 
+          centerName: centerCode, 
+          role: role,
+          location: locationSlug,
+          index: dailyCount + 1
+        },
         (progress) => setUploadProgress(progress),
         abortControllerRef.current
       );
@@ -139,7 +161,8 @@ export default function VideoUploadModal({
         selectedEmotions[0] || "General", 
         { 
           allTags: selectedEmotions,
-          context: currentContext === "School" ? "school" : "home",
+          location: selectedLocation || "",
+          context: selectedLocation === "Tại trường" ? "school" : "home",
           topic: finalTopic,
           duration: Math.round(duration),
           lesson: initialLesson || "",
@@ -177,7 +200,7 @@ export default function VideoUploadModal({
     setStep("upload");
     setVideo(null);
     setSelectedEmotions([]);
-    setContext(null);
+    setLocation(null);
     setUploadProgress(0);
     abortControllerRef.current = null;
   };
@@ -314,30 +337,36 @@ export default function VideoUploadModal({
           {step === "context" && (
             <motion.div key="c" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
               <div className="space-y-2">
-                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Bối cảnh Video</h2>
-                <p className="text-sm text-gray-500 font-medium">Video này được quay trong bối cảnh nào?</p>
+                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Vị trí quay Video?</h2>
+                <p className="text-sm text-gray-500 font-medium">Bé đang ở đâu trong video này?</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { id: 'home', label: 'Tại nhà', icon: <Home size={24} /> },
+                  { id: 'school', label: 'Tại trường', icon: <Building2 size={24} /> },
+                  { id: 'public', label: 'Công cộng', icon: <Sparkles size={24} /> },
+                  { id: 'other', label: 'Khác', icon: <Video size={24} /> }
+                ].map((loc) => (
+                  <button 
+                    key={loc.id}
+                    onClick={() => handleLocationSelect(loc.label)}
+                    className="flex flex-col items-center gap-4 p-6 rounded-[32px] border-2 border-gray-100 hover:border-primary hover:bg-primary/5 transition-all group"
+                  >
+                    <div className="p-3 bg-gray-50 rounded-2xl group-hover:bg-primary group-hover:text-white transition-colors">
+                      {loc.icon}
+                    </div>
+                    <span className="font-black text-[10px] uppercase tracking-widest text-gray-900">{loc.label}</span>
+                  </button>
+                ))}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={() => handleContextSelect("Home")}
-                  className="flex flex-col items-center gap-6 p-10 rounded-[40px] border-2 border-gray-100 hover:border-primary hover:bg-primary/5 transition-all group"
-                >
-                  <div className="p-4 bg-gray-50 rounded-2xl group-hover:bg-primary group-hover:text-white transition-colors">
-                    <Home size={32} />
-                  </div>
-                  <span className="font-black text-sm uppercase tracking-widest text-gray-900">Tại nhà</span>
-                </button>
-                <button 
-                  onClick={() => handleContextSelect("School")}
-                  className="flex flex-col items-center gap-6 p-10 rounded-[40px] border-2 border-gray-100 hover:border-primary hover:bg-primary/5 transition-all group"
-                >
-                  <div className="p-4 bg-gray-50 rounded-2xl group-hover:bg-primary group-hover:text-white transition-colors">
-                    <Building2 size={32} />
-                  </div>
-                  <span className="font-black text-sm uppercase tracking-widest text-gray-900">Tại trường</span>
-                </button>
-              </div>
+              <button 
+                onClick={() => handleLocationSelect(null)}
+                className="w-full py-4 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Bỏ qua bước này
+              </button>
             </motion.div>
           )}
 

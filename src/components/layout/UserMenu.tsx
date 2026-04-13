@@ -57,7 +57,7 @@ export default function UserMenu({ userName, role, avatarInitial }: UserMenuProp
               initial={{ opacity: 0, y: 10, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-              className="absolute right-0 sm:right-auto sm:left-0 mt-4 w-64 bg-white border border-gray-100 shadow-2xl rounded-[32px] overflow-hidden z-[100] p-2 origin-top-right sm:origin-top-left"
+              className="absolute left-0 top-full mt-2 w-64 bg-white border border-gray-100 shadow-2xl rounded-[24px] sm:rounded-[32px] overflow-hidden z-[100] p-2 origin-top-left"
             >
               <div className="px-6 py-4 border-b border-gray-100/50 mb-2">
                 <p className="text-sm font-black text-gray-900">{userName}</p>

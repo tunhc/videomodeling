@@ -8,6 +8,8 @@ import ActivityItem from "@/components/parent/ActivityItem";
 import VideoUploadModal from "@/components/VideoUploadModal";
 import UserMenu from "@/components/layout/UserMenu";
 import { subscribeToTasks, acknowledgeTask, CollaborationTask } from "@/lib/services/taskService";
+import { videoService } from "@/lib/services/videoService";
+import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { generateWeeklyScheduleAction } from "@/app/actions/gemini";
 import { cloudinaryService } from "@/lib/services/cloudinaryService";
@@ -241,7 +243,7 @@ export default function ParentHome() {
         )}
       </AnimatePresence>
 
-      <header className="p-8 pt-12 flex justify-between items-start bg-white/50 backdrop-blur-md sticky top-0 z-40">
+      <header className="px-4 sm:px-8 py-4 sm:py-8 flex justify-between items-center bg-white/90 backdrop-blur-md sticky top-0 z-40">
         <UserMenu userName={userProfile?.displayName || "Phụ huynh"} role={userProfile?.role || "parent"} />
         <div className="relative p-3 bg-white rounded-2xl shadow-sm border border-gray-100">
           <Bell size={24} className="text-gray-400" />

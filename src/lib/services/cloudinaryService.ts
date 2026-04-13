@@ -7,7 +7,7 @@ export const cloudinaryService = {
    */
   async uploadVideo(
     file: File,
-    metadata: { childId: string; centerName: string; role?: string },
+    metadata: { childId: string; centerName: string; role?: string; location?: string; index?: number },
     onProgress?: (progress: number) => void,
     abortController?: AbortController
   ) {
@@ -22,13 +22,22 @@ export const cloudinaryService = {
     formData.append("file", file);
     formData.append("upload_preset", uploadPreset);
     
-    // Dynamic folder structure and tagging based on child info
-    const timestamp = new Date().toISOString().replace(/[-:T.]/g, "").slice(0, 12);
-    const role = metadata.role || "unknown";
+    // Format: Role_ChildID_Location_MMDDYYYY
+    const now = new Date();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const dateStr = `${mm}${dd}${yyyy}`;
     
-    formData.append("folder", `AI4Autism/${metadata.centerName}/Children/${metadata.childId}`);
-    formData.append("public_id", `${role}_${metadata.childId}_${timestamp}`);
-    formData.append("tags", `${metadata.childId},${metadata.centerName}${metadata.role ? ',' + metadata.role : ''},vst-auto-upload`);
+    const roleCapitalized = metadata.role ? metadata.role.charAt(0).toUpperCase() + metadata.role.slice(1).toLowerCase() : "Unknown";
+    const childIdClean = metadata.childId.replace(/_/g, '-');
+    const centerNameClean = metadata.centerName.replace(/_/g, '-');
+    const locationSlug = metadata.location || "unspecified";
+    const indexStr = metadata.index !== undefined ? `-${String(metadata.index).padStart(2, '0')}` : "";
+
+    formData.append("folder", `AI4Autism/${centerNameClean}/Children/${childIdClean}`);
+    formData.append("public_id", `${roleCapitalized}_${childIdClean}_${locationSlug}-${dateStr}${indexStr}`);
+    formData.append("tags", `${childIdClean},${centerNameClean},${roleCapitalized},vst-auto-upload`);
 
     return new Promise<{ url: string; publicId: string; secureUrl: string }>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
@@ -57,7 +66,13 @@ export const cloudinaryService = {
             secureUrl: response.secure_url,
           });
         } else {
-          reject(new Error(`Cloudinary upload failed: ${xhr.statusText}`));
+          try {
+            const errorRes = JSON.parse(xhr.responseText);
+            console.error("Cloudinary Detailed Error:", errorRes);
+            reject(new Error(`Cloudinary upload failed: ${errorRes.error?.message || xhr.statusText}`));
+          } catch (e) {
+            reject(new Error(`Cloudinary upload failed: ${xhr.statusText}`));
+          }
         }
       };
 

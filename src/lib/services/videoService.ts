@@ -76,6 +76,7 @@ export const videoService = {
       verifiedTags: [],
       createdAt: serverTimestamp(),
       duration: metadata.duration || 0,
+      location: metadata.location || "",
       ...metadata
     };
 

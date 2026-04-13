@@ -74,7 +74,7 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} className="space-y-6">
           {/* Center Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 ml-1">Trung tâm</label>
+            <label className="text-sm font-bold text-gray-800 ml-1">Trung tâm</label>
             <div className="relative">
               <select 
                 value={center}
@@ -93,7 +93,7 @@ export default function LoginPage() {
 
           {/* Username */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 ml-1">ID người dùng</label>
+            <label className="text-sm font-bold text-gray-800 ml-1">ID người dùng</label>
             <div className="relative">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                 <User size={18} />
@@ -110,7 +110,7 @@ export default function LoginPage() {
 
           {/* Password */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 ml-1">Mật khẩu</label>
+            <label className="text-sm font-bold text-gray-800 ml-1">Mật khẩu</label>
             <div className="relative">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                 <Lock size={18} />
