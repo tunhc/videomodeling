@@ -126,7 +126,9 @@ export default function ParentHome() {
       // 1. Get Child Stats for AI context
       const statsRef = doc(db, "hpdt_stats", userProfile.childId);
       const statsSnap = await getDoc(statsRef);
-      const stats = statsSnap.exists() ? statsSnap.data() : { hpdt: userProfile.hpdt || 75 };
+      // Serializing for Server Action (Removing non-plain objects like Timestamps)
+      const rawStats = statsSnap.exists() ? statsSnap.data() : { hpdt: userProfile.hpdt || 75 };
+      const stats = JSON.parse(JSON.stringify(rawStats));
       
       // 2. Call AI
       const aiResponse = await generateDailyScheduleAction(stats, userProfile.displayName || "Bé");
@@ -346,24 +348,33 @@ export default function ParentHome() {
             {loadingSchedule ? (
                <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-primary" size={24} /></div>
             ) : todayActivities.length > 0 ? (
-               <div className="space-y-4">
+               <div className="space-y-0 relative pl-4 border-l-2 border-dashed border-primary/20 ml-4">
                 {todayActivities.map((item, idx) => (
-                  <ActivityItem 
-                    key={idx} 
-                    title={item.title} 
-                    location={item.requiresModeling ? "Yêu cầu Video" : "Xem giáo án"} 
-                    duration={item.domain} 
-                    isCompleted={false}
-                    onUpload={item.requiresModeling ? () => startUpload(item.title) : undefined}
-                  />
+                  <div key={idx} className="relative pb-10 last:pb-4">
+                    {/* Timeline Dot */}
+                    <div className="absolute -left-[25px] top-6 w-4 h-4 rounded-full bg-primary border-4 border-white shadow-sm z-10" />
+                    
+                    <div className="space-y-2">
+                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 pl-2">
+                          {idx === 0 ? "Buổi Sáng" : idx === 1 ? "Buổi Trưa" : "Buổi Chiều"}
+                       </span>
+                       <ActivityItem 
+                        title={item.title} 
+                        location={item.requiresModeling ? "Yêu cầu Video" : "Xem giáo án"} 
+                        duration={item.domain} 
+                        isCompleted={false}
+                        onUpload={item.requiresModeling ? () => startUpload(item.title) : undefined}
+                      />
+                    </div>
+                  </div>
                 ))}
                 <button 
                   onClick={handleGenerateDailyAI}
                   disabled={generatingDaily}
-                  className="w-full flex items-center justify-center gap-2 py-4 border-2 border-dashed border-primary/20 rounded-[28px] text-[10px] font-black uppercase tracking-widest text-primary/60 hover:text-primary hover:border-primary/40 transition-all"
+                  className="w-full flex items-center justify-center gap-2 py-4 mt-4 bg-white/50 border border-gray-100 rounded-[28px] text-[10px] font-black uppercase tracking-widest text-primary/60 hover:text-primary hover:border-primary/40 transition-all"
                 >
                   {generatingDaily ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  Cập nhật lộ trình AI mới
+                  Làm mới lộ trình (AI)
                 </button>
                </div>
             ) : (
