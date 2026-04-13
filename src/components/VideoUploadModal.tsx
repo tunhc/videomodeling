@@ -26,11 +26,15 @@ export default function VideoUploadModal({
   initialCategory 
 }: VideoUploadModalProps) {
   const router = useRouter();
-  const configuredMaxUploadMb = Number(process.env.NEXT_PUBLIC_CLOUDINARY_MAX_FILE_SIZE_MB || "100");
-  const maxUploadMb = Number.isFinite(configuredMaxUploadMb) && configuredMaxUploadMb > 0
-    ? configuredMaxUploadMb
-    : 100;
-  const maxUploadBytes = Math.floor(maxUploadMb * 1024 * 1024);
+  const rawMaxUploadMb = (process.env.NEXT_PUBLIC_CLOUDINARY_MAX_FILE_SIZE_MB || "").trim();
+  const configuredMaxUploadMb = Number(rawMaxUploadMb);
+  const hasClientUploadCap =
+    rawMaxUploadMb.length > 0 && Number.isFinite(configuredMaxUploadMb) && configuredMaxUploadMb > 0;
+  const maxUploadMb = hasClientUploadCap ? configuredMaxUploadMb : null;
+  const displayMaxUploadMb = maxUploadMb ?? 0;
+  const maxUploadBytes = hasClientUploadCap && maxUploadMb !== null
+    ? Math.floor(maxUploadMb * 1024 * 1024)
+    : null;
   const [step, setStep] = useState<"upload" | "processing" | "labeling" | "context" | "success">("upload");
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
   const [location, setLocation] = useState<string | null>(null);
@@ -46,13 +50,13 @@ export default function VideoUploadModal({
     if (file) {
       setUploadError("");
 
-      if (file.size > maxUploadBytes) {
+      if (maxUploadBytes !== null && file.size > maxUploadBytes) {
         const currentSizeMb = (file.size / (1024 * 1024)).toFixed(1);
         setVideo(null);
         setStep("upload");
         e.target.value = "";
         setUploadError(
-          `Video ${currentSizeMb}MB vượt giới hạn gói Cloudinary hiện tại (${maxUploadMb}MB). ` +
+          `Video ${currentSizeMb}MB vượt giới hạn cấu hình hiện tại (${displayMaxUploadMb}MB). ` +
             "Vui lòng cắt ngắn video, nén xuống 720p hoặc chia thành nhiều clip nhỏ."
         );
         return;
@@ -218,10 +222,17 @@ export default function VideoUploadModal({
       } else {
         console.error("Upload failed:", error);
         if (message.toLowerCase().includes("file size too large")) {
-          setUploadError(
-            `Cloudinary giới hạn tối đa ${maxUploadMb}MB cho mỗi file ở gói hiện tại. ` +
-              "Vui lòng giảm dung lượng hoặc tách clip trước khi tải lên."
-          );
+          if (hasClientUploadCap) {
+            setUploadError(
+              `Cloudinary từ chối file vượt giới hạn hiện tại (${displayMaxUploadMb}MB). ` +
+                "Vui lòng giảm dung lượng hoặc tách clip trước khi tải lên."
+            );
+          } else {
+            setUploadError(
+              "Cloudinary từ chối file vì vượt giới hạn preset/gói hiện tại. " +
+                "Vui lòng tăng giới hạn trên Cloudinary hoặc giảm dung lượng video."
+            );
+          }
         } else {
           setUploadError(`Tải lên thất bại: ${message}`);
         }
@@ -267,7 +278,11 @@ export default function VideoUploadModal({
               <div className="space-y-2">
                 <h2 className="text-3xl font-black text-gray-900 tracking-tight">Tải Video Lên</h2>
                 <p className="text-sm text-gray-500 font-medium tracking-tight">Lưu trữ hành trình Video Modeling của bé (Cloudinary Storage).</p>
-                <p className="text-xs text-amber-600 font-bold">Giới hạn hiện tại: tối đa {maxUploadMb}MB mỗi video.</p>
+                {hasClientUploadCap ? (
+                  <p className="text-xs text-amber-600 font-bold">Giới hạn hiện tại: tối đa {displayMaxUploadMb}MB mỗi video.</p>
+                ) : (
+                  <p className="text-xs text-amber-600 font-bold">Giới hạn hiện tại: theo cấu hình Cloudinary của hệ thống.</p>
+                )}
               </div>
               
               <label 

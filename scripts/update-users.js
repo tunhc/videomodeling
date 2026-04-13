@@ -21,16 +21,21 @@ async function updateUsers() {
 
     console.log('Updating GV_admin...');
     await db.collection('users').doc('GV_admin').set({
-      role: 'teacher'
+      role: 'admin',
+      password: 'admin$$$',
+      displayName: 'Admin Giáo Viên',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
-    console.log('✅ GV_admin updated to teacher.');
+    console.log('✅ GV_admin updated to admin.');
 
     console.log('Updating PH_admin...');
     await db.collection('users').doc('PH_admin').set({
-      role: 'parent',
-      childId: 'PH_KBC-HCM_Anh-G22'
+      role: 'admin',
+      password: 'admin$$$',
+      displayName: 'Admin Phụ Huynh',
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
-    console.log('✅ PH_admin updated to parent and linked to PH_KBC-HCM_Anh-G22.');
+    console.log('✅ PH_admin updated to admin.');
 
     // Also ensure PH_KBC-HCM_Anh-G22 exists in children or at least has stats?
     // The user didn't ask but it's good for testing.

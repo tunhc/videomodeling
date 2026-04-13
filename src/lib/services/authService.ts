@@ -20,7 +20,27 @@ interface AppUserAuthRecord {
   updatedAt?: unknown;
 }
 
+const DEFAULT_ADMIN_USER_IDS = ["PH_admin", "GV_admin"];
+
+const ADMIN_USER_IDS = new Set(
+  [
+    ...DEFAULT_ADMIN_USER_IDS,
+    ...(process.env.NEXT_PUBLIC_ADMIN_USER_IDS || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  ]
+);
+
+function isAdminAccount(userId: string) {
+  return ADMIN_USER_IDS.has(userId);
+}
+
 function normalizeRole(role: unknown, userId: string): AppUserRole {
+  if (isAdminAccount(userId)) {
+    return "admin";
+  }
+
   const normalized = typeof role === "string" ? role.toLowerCase() : "";
   if (normalized === "parent" || normalized === "teacher" || normalized === "admin") {
     return normalized;
@@ -71,6 +91,11 @@ async function teacherHasAnyLearner(teacherId: string) {
 }
 
 async function bootstrapUserIfMissing(userId: string, password: string) {
+  // Admin IDs must be explicitly provisioned to avoid accidental role drift.
+  if (isAdminAccount(userId)) {
+    return null;
+  }
+
   if (userId.startsWith("PH_")) {
     const childInfo = await findChildForParent(userId);
     if (!childInfo) return null;
