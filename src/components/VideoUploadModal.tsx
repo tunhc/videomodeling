@@ -4,8 +4,7 @@ import { X, Upload, CheckCircle2, Loader2, Sparkles, ChevronRight, Video, Home, 
 import { useRouter } from "next/navigation";
 import { videoService } from "@/lib/services/videoService";
 import { cloudinaryService } from "@/lib/services/cloudinaryService";
-import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { getLearnerByIdAnyCollection, resolveLearnerForParent } from "@/lib/services/learnerService";
 
 interface VideoUploadModalProps {
   isOpen: boolean;
@@ -121,22 +120,28 @@ export default function VideoUploadModal({
       // If parent and no childId passed, resolve from localStorage/Profile
       if (role === "parent" && !activeChildId) {
          const userId = localStorage.getItem("userId") || "";
-         activeChildId = userId.replace("PH_", "");
+         const learner = await resolveLearnerForParent(userId);
+         if (learner) {
+           activeChildId = learner.id;
+           centerCode = learner.schoolCode || centerCode;
+           childName = learner.name || childName;
+         } else {
+           activeChildId = userId.replace("PH_", "");
+         }
       }
 
       // Fetch Child data to get schoolCode (centerCode) and name
       if (activeChildId) {
         try {
-          const childSnap = await getDoc(doc(db, "children", activeChildId));
-          if (childSnap.exists()) {
-            const data = childSnap.data();
+          const learner = await getLearnerByIdAnyCollection(activeChildId);
+          if (learner) {
             // If schoolCode is just "KBC", try to get more specific code from ID (e.g., KBC-HCM)
-            let sc = data.schoolCode || "KBC";
+            let sc = learner.schoolCode || "KBC";
             if (sc === "KBC" && activeChildId.includes("_")) {
               sc = activeChildId.split("_")[0];
             }
             centerCode = sc;
-            childName = data.name || "";
+            childName = learner.name || "";
           }
         } catch (e) {
           console.error("Failed to fetch child data:", e);

@@ -6,8 +6,9 @@ import { Search, QrCode, TrendingUp, Upload, MessageCircle } from "lucide-react"
 import VideoUploadModal from "@/components/VideoUploadModal";
 import UserMenu from "@/components/layout/UserMenu";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
+import { getLearnersForTeacher } from "@/lib/services/learnerService";
 
 interface Student {
   id: string;
@@ -60,23 +61,14 @@ export default function TeacherHome() {
           }
         }
 
-        // If admin, show all children. If teacher, filter by teacherId.
-        const q = role === "admin" 
-          ? query(collection(db, "children"))
-          : query(collection(db, "children"), where("teacherId", "==", userId));
-          
-        const snap = await getDocs(q);
-        const list: Student[] = snap.docs.map((d) => {
-          const data = d.data();
-          if (!data) return null;
-          return {
-            id: d.id,
-            name: data.name || "Học sinh không tên",
-            initial: data.initial || (data.name ? data.name[0] : "?"),
-            status: data.status || "Bình thường",
-            hpdt: data.hpdt || 0,
-          };
-        }).filter(Boolean) as Student[];
+        const learners = await getLearnersForTeacher(userId, role);
+        const list: Student[] = learners.map((learner) => ({
+          id: learner.id,
+          name: learner.name || "Học sinh không tên",
+          initial: learner.initial || (learner.name ? learner.name[0] : "?"),
+          status: learner.status || "Bình thường",
+          hpdt: typeof learner.hpdt === "number" ? learner.hpdt : 0,
+        }));
         setStudents(list);
       } catch (e) {
         console.error("Failed to load teacher data:", e);

@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { generateWeeklyScheduleAction } from "@/app/actions/gemini";
 import { cloudinaryService } from "@/lib/services/cloudinaryService";
+import { resolveLearnerForParent } from "@/lib/services/learnerService";
 
 interface Activity {
   title: string;
@@ -59,6 +60,14 @@ export default function ParentHome() {
         } else {
           profile = { id: userId, role: userRole, childId: (userId as string).replace("PH_", "") };
         }
+
+        const learner = await resolveLearnerForParent(userId as string, profile?.childId);
+        if (learner) {
+          profile.childId = learner.id;
+          profile.childName = learner.name;
+          profile.teacherId = learner.teacherId || profile.teacherId;
+        }
+
         setUserProfile(profile);
 
         // Fetch Schedule

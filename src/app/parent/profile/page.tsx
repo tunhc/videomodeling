@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { User, Calendar, MapPin, Shield, Brain, Heart, ChevronRight, Settings, LogOut, Bell, FileText, Loader2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { resolveLearnerForParent } from "@/lib/services/learnerService";
 
 export default function ProfilePage() {
   const [childData, setChildData] = useState<any>(null);
@@ -25,10 +26,9 @@ export default function ProfilePage() {
           const userData = userSnap.data();
           setUserProfile(userData);
 
-          const childId = userData.childId || (userId as string).replace("PH_", "");
-          const childSnap = await getDoc(doc(db, "children", childId as string));
-          if (childSnap.exists()) {
-            setChildData({ id: childSnap.id, ...childSnap.data() });
+          const learner = await resolveLearnerForParent(userId as string, userData.childId);
+          if (learner) {
+            setChildData(learner);
           }
         }
       } catch (e) {

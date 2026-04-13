@@ -8,9 +8,10 @@ import {
   Target, Zap, Flame, Star
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { generateWeeklyComboAction } from "@/app/actions/gemini";
 import VideoUploadModal from "@/components/VideoUploadModal";
+import { getLearnersForTeacher } from "@/lib/services/learnerService";
 
 interface Activity {
   lesson: string;
@@ -35,12 +36,7 @@ export default function InterventionHub() {
   useEffect(() => {
     async function loadChildren() {
       try {
-        const q = userRole === "admin"
-          ? query(collection(db, "children"))
-          : query(collection(db, "children"), where("teacherId", "==", userId));
-        
-        const snap = await getDocs(q);
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const list = await getLearnersForTeacher(userId, userRole);
         setChildren(list);
         if (list.length > 0) setSelectedChild(list[0]);
       } catch (e) {

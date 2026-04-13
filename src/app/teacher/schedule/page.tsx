@@ -9,8 +9,9 @@ import {
 } from "lucide-react";
 import VideoUploadModal from "@/components/VideoUploadModal";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { generateWeeklyScheduleAction, generateLessonPlanAction } from "@/app/actions/gemini";
+import { getLearnersForTeacher } from "@/lib/services/learnerService";
 
 interface Activity {
   title: string;
@@ -45,12 +46,7 @@ export default function TeacherSchedule() {
   useEffect(() => {
     async function loadChildren() {
       try {
-        const q = userRole === "admin"
-          ? query(collection(db, "children"))
-          : query(collection(db, "children"), where("teacherId", "==", userId));
-        
-        const snap = await getDocs(q);
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const list = await getLearnersForTeacher(userId, userRole);
         setChildren(list);
         if (list.length > 0) setSelectedChild(list[0]);
       } catch (e) {

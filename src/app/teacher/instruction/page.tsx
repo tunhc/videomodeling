@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { Send, MessageSquare, Sparkles, CheckCircle2, Bell, Loader2, Users, ChevronRight } from "lucide-react";
 import { sendInstruction } from "@/lib/services/taskService";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, getDoc, doc } from "firebase/firestore";
+import { getDoc, doc } from "firebase/firestore";
+import { getLearnersForTeacher } from "@/lib/services/learnerService";
 
 export default function InstructionPage() {
   const [message, setMessage] = useState("");
@@ -33,12 +34,7 @@ export default function InstructionPage() {
   useEffect(() => {
     async function loadChildren() {
       try {
-        const q = userRole === "admin"
-          ? query(collection(db, "children"))
-          : query(collection(db, "children"), where("teacherId", "==", userId));
-        
-        const snap = await getDocs(q);
-        const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const list = await getLearnersForTeacher(userId, userRole);
         setChildren(list);
         if (list.length > 0) setSelectedChild(list[0]);
       } catch (e) {
