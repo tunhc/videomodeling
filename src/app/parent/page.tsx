@@ -11,7 +11,7 @@ import { subscribeToTasks, acknowledgeTask, CollaborationTask } from "@/lib/serv
 import { videoService } from "@/lib/services/videoService";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { generateDailyScheduleAction } from "@/app/actions/gemini";
+import { generateWeeklyScheduleAction } from "@/app/actions/gemini";
 
 interface Activity {
   title: string;
@@ -31,9 +31,9 @@ export default function ParentHome() {
   const [videoModelingSessions, setVideoModelingSessions] = useState<any[]>([]);
   const [loadingVideos, setLoadingVideos] = useState(true);
 
-  const [todayActivities, setTodayActivities] = useState<Activity[]>([]);
+  const [weeklySchedule, setWeeklySchedule] = useState<any[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
-  const [generatingDaily, setGeneratingDaily] = useState(false);
+  const [generatingWeekly, setGeneratingWeekly] = useState(false);
   const [activeUploadTopic, setActiveUploadTopic] = useState("");
 
   // 1. Load User Profile
@@ -65,11 +65,7 @@ export default function ParentHome() {
           const scheduleRef = doc(db, "weekly_schedules", profile.childId);
           const scheduleSnap = await getDoc(scheduleRef);
           if (scheduleSnap.exists()) {
-            const days = scheduleSnap.data().days || [];
-            const daysMap = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
-            const todayStr = daysMap[new Date().getDay()];
-            const todayData = days.find((d: any) => d.day === todayStr);
-            if (todayData) setTodayActivities(todayData.activities || []);
+            setWeeklySchedule(scheduleSnap.data().days || []);
           }
         }
       } catch (e) {
@@ -119,65 +115,68 @@ export default function ParentHome() {
     loadChildVideos();
   }, [userProfile]);
 
-  const handleGenerateDailyAI = async () => {
+  const handleGenerateWeeklyAI = async () => {
     if (!userProfile?.childId) return;
-    setGeneratingDaily(true);
+    setGeneratingWeekly(true);
     try {
-      // 1. Get Child Stats for AI context
+      // 1. Get Child Stats
       const statsRef = doc(db, "hpdt_stats", userProfile.childId);
       const statsSnap = await getDoc(statsRef);
-      // Serializing for Server Action (Removing non-plain objects like Timestamps)
       const rawStats = statsSnap.exists() ? statsSnap.data() : { hpdt: userProfile.hpdt || 75 };
       const stats = JSON.parse(JSON.stringify(rawStats));
       
       // 2. Call AI
-      const aiResponse = await generateDailyScheduleAction(stats, userProfile.displayName || "Bé");
+      const aiResponse = await generateWeeklyScheduleAction(stats, userProfile.displayName || "Bé");
       
       // 3. Parse JSON
-      let activities: Activity[] = [];
+      let parsedDays: any[] = [];
       try {
         const jsonMatch = aiResponse.match(/\[.*\]/s);
         if (jsonMatch) {
-          activities = JSON.parse(jsonMatch[0]);
+          parsedDays = JSON.parse(jsonMatch[0]);
         }
       } catch (e) {
         console.error("AI Parse failed:", e);
       }
 
-      if (activities.length > 0) {
-        // 4. Update weekly_schedules specifically for today
-        const scheduleRef = doc(db, "weekly_schedules", userProfile.childId);
-        const scheduleSnap = await getDoc(scheduleRef);
-        
-        const daysMap = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
-        const todayStr = daysMap[new Date().getDay()];
-        
-        if (scheduleSnap.exists()) {
-          const existingDays = scheduleSnap.data().days || [];
-          const dayIdx = existingDays.findIndex((d: any) => d.day === todayStr);
-          
-          if (dayIdx >= 0) {
-            existingDays[dayIdx].activities = activities;
-          } else {
-            existingDays.push({ day: todayStr, activities: activities });
-          }
-          await updateDoc(scheduleRef, { days: existingDays });
-        } else {
-          await setDoc(scheduleRef, {
-            childId: userProfile.childId,
-            days: [{ day: todayStr, activities: activities }],
-            updatedAt: new Date()
-          });
-        }
-        
-        setTodayActivities(activities);
+      if (parsedDays.length === 0) {
+        // Mock Failover
+        parsedDays = generateMockWeekly();
+        setToastMessage("Đang sử dụng lộ trình mẫu do lỗi kết nối AI.");
+        setShowToast(true);
       }
+
+      // 4. Save to Firestore
+      const scheduleRef = doc(db, "weekly_schedules", userProfile.childId);
+      await setDoc(scheduleRef, {
+        childId: userProfile.childId,
+        days: parsedDays,
+        updatedAt: new Date()
+      });
+      
+      setWeeklySchedule(parsedDays);
     } catch (e) {
-      console.error("Generate daily failed:", e);
-      alert("Không thể tạo lộ trình lúc này. Vui lòng thử lại sau.");
+      console.error("Generate weekly failed:", e);
+      // Mock Failover
+      const mockDays = generateMockWeekly();
+      setWeeklySchedule(mockDays);
+      setToastMessage("Đang sử dụng lộ trình mẫu do lỗi kết nối AI.");
+      setShowToast(true);
     } finally {
-      setGeneratingDaily(false);
+      setGeneratingWeekly(false);
     }
+  };
+
+  const generateMockWeekly = () => {
+    const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
+    return days.map(d => ({
+      day: d,
+      activities: [
+        { title: "Giao tiếp mắt & Chào hỏi", description: "Bé nhìn vào mắt và vẫy tay khi được gọi tên.", domain: "Giao tiếp", requiresModeling: true },
+        { title: "Vận động tinh: Gắp hạt", description: "Bé dùng kẹp gắp hạt đậu từ bát này sang bát kia.", domain: "Vận động", requiresModeling: false },
+        { title: "Tự phục vụ: Cất dọn đồ chơi", description: "Bé tự tay cất đồ chơi vào thùng sau khi chơi xong.", domain: "Tự phục vụ", requiresModeling: true },
+      ]
+    }));
   };
 
   const handleDeleteVideo = async (vidId: string, createdAt: any) => {
@@ -333,66 +332,88 @@ export default function ParentHome() {
           </div>
         </section>
 
-        {/* Lộ trình hôm nay - SYNC with Teacher Schedule */}
-        <section className="space-y-6">
+        {/* Lộ trình tuần này */}
+        <section className="space-y-8 pb-10">
           <div className="flex justify-between items-end">
             <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
-              <span className="text-yellow-500"><Zap size={24} fill="currentColor" /></span> Lộ trình hôm nay
+              <span className="text-yellow-500"><Zap size={24} fill="currentColor" /></span> Lộ trình tuần này
             </h3>
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest pb-1 border-b italic">
-               {new Date().toLocaleDateString('vi-VN')}
-            </span>
+            <button 
+              onClick={handleGenerateWeeklyAI}
+              disabled={generatingWeekly}
+              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 px-4 py-2 rounded-xl transition-all"
+            >
+              {generatingWeekly ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Làm mới cả tuần
+            </button>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-12">
             {loadingSchedule ? (
                <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-primary" size={24} /></div>
-            ) : todayActivities.length > 0 ? (
-               <div className="space-y-0 relative pl-4 border-l-2 border-dashed border-primary/20 ml-4">
-                {todayActivities.map((item, idx) => (
-                  <div key={idx} className="relative pb-10 last:pb-4">
-                    {/* Timeline Dot */}
-                    <div className="absolute -left-[25px] top-6 w-4 h-4 rounded-full bg-primary border-4 border-white shadow-sm z-10" />
-                    
-                    <div className="space-y-2">
-                       <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 pl-2">
-                          {idx === 0 ? "Buổi Sáng" : idx === 1 ? "Buổi Trưa" : "Buổi Chiều"}
-                       </span>
-                       <ActivityItem 
-                        title={item.title} 
-                        location={item.requiresModeling ? "Yêu cầu Video" : "Xem giáo án"} 
-                        duration={item.domain} 
-                        isCompleted={false}
-                        onUpload={item.requiresModeling ? () => startUpload(item.title) : undefined}
-                      />
+            ) : weeklySchedule.length > 0 ? (
+              weeklySchedule.map((day, dIdx) => {
+                const daysMap = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
+                const isToday = day.day === daysMap[new Date().getDay()];
+                
+                return (
+                  <div key={dIdx} className={`space-y-6 ${isToday ? 'bg-primary/5 -mx-4 px-4 py-8 rounded-[40px] border border-primary/10 shadow-sm ring-4 ring-primary/5' : ''}`}>
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center font-black ${isToday ? 'bg-primary text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100 shadow-sm'}`}>
+                        <span className="text-[8px] uppercase tracking-tighter opacity-70">Thứ</span>
+                        <span className="text-lg leading-none">{day.day.split(" ")[1] || "?"}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <h4 className={`text-lg font-black tracking-tight ${isToday ? 'text-primary' : 'text-gray-900'}`}>
+                            {day.day}
+                          </h4>
+                          {isToday && <span className="bg-primary text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full">Hôm nay</span>}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest italic">3 bài tập can thiệp AI</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-0 relative pl-4 border-l-2 border-dashed border-gray-100 ml-6">
+                      {day.activities.map((item: any, idx: number) => (
+                        <div key={idx} className="relative pb-8 last:pb-0">
+                          {/* Timeline Dot */}
+                          <div className={`absolute -left-[25px] top-6 w-4 h-4 rounded-full border-4 border-white shadow-sm z-10 ${isToday ? 'bg-primary' : 'bg-gray-200'}`} />
+                          
+                          <div className="space-y-2">
+                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-300 pl-2">
+                                {idx === 0 ? "Buổi Sáng" : idx === 1 ? "Buổi Trưa" : "Buổi Chiều"}
+                             </span>
+                             <ActivityItem 
+                                title={item.title} 
+                                location={item.requiresModeling ? "Yêu cầu Video" : "Xem giáo án"} 
+                                duration={item.domain} 
+                                isCompleted={false}
+                                onUpload={item.requiresModeling ? () => startUpload(item.title) : undefined}
+                              />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
-                <button 
-                  onClick={handleGenerateDailyAI}
-                  disabled={generatingDaily}
-                  className="w-full flex items-center justify-center gap-2 py-4 mt-4 bg-white/50 border border-gray-100 rounded-[28px] text-[10px] font-black uppercase tracking-widest text-primary/60 hover:text-primary hover:border-primary/40 transition-all"
-                >
-                  {generatingDaily ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  Làm mới lộ trình (AI)
-                </button>
-               </div>
+                );
+              })
             ) : (
               <div className="bg-white rounded-[40px] p-10 text-center border-2 border-dashed border-gray-100 space-y-6">
                  <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto">
                     <Calendar size={32} className="text-gray-200" />
                  </div>
                  <div className="space-y-2">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest leading-none">Chưa có lịch dạy hôm nay</p>
-                    <p className="text-[10px] text-gray-300 font-medium italic">Bạn có muốn AI cá nhân hóa lộ trình 3 bài tập cho bé không?</p>
+                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest leading-none">Chưa có lịch dạy tuần này</p>
+                    <p className="text-[10px] text-gray-300 font-medium italic">Bạn có muốn AI cá nhân hóa lộ trình 7 ngày cho bé không?</p>
                  </div>
                  <button 
-                    onClick={handleGenerateDailyAI}
-                    disabled={generatingDaily}
+                    onClick={handleGenerateWeeklyAI}
+                    disabled={generatingWeekly}
                     className="bg-primary text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 mx-auto"
                  >
-                    {generatingDaily ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} fill="currentColor" />}
-                    Tạo lộ trình hôm nay (AI)
+                    {generatingWeekly ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} fill="currentColor" />}
+                    Tạo lộ trình tuần này (AI)
                  </button>
               </div>
             )}
