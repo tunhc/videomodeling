@@ -180,8 +180,10 @@ export async function changeUserPassword(input: {
   userId: string;
   currentPassword: string;
   nextPassword: string;
+  userRole?: AppUserRole;
 }) {
-  const userRef = doc(db, "users", input.userId.trim());
+  const userId = input.userId.trim();
+  const userRef = doc(db, "users", userId);
   const snap = await getDoc(userRef);
 
   if (!snap.exists()) {
@@ -190,8 +192,15 @@ export async function changeUserPassword(input: {
 
   const data = snap.data() as AppUserAuthRecord;
   const storedPassword = typeof data.password === "string" ? data.password : "";
+  const currentPassword = input.currentPassword.trim();
+  const resolvedRole = input.userRole || normalizeRole(data.role, userId);
+  const isAdmin = resolvedRole === "admin" || isAdminAccount(userId);
 
-  if (storedPassword && storedPassword !== input.currentPassword) {
+  if (isAdmin) {
+    if (!currentPassword || storedPassword !== currentPassword) {
+      throw new Error("Mật khẩu hiện tại không đúng");
+    }
+  } else if (currentPassword && storedPassword && storedPassword !== currentPassword) {
     throw new Error("Mật khẩu hiện tại không đúng");
   }
 

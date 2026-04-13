@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { LogOut, User, Settings, ChevronDown, Lock, Loader2, X } from "lucide-react";
@@ -22,7 +23,24 @@ export default function UserMenu({ userName, role, avatarInitial }: UserMenuProp
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setPortalRoot(document.body);
+  }, []);
+
+  useEffect(() => {
+    if (!portalRoot) return;
+    const originalOverflow = document.body.style.overflow;
+    if (isPasswordModalOpen) {
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isPasswordModalOpen, portalRoot]);
 
   const handleLogout = () => {
     clearAuthSession();
@@ -48,8 +66,15 @@ export default function UserMenu({ userName, role, avatarInitial }: UserMenuProp
     setPasswordError("");
     setPasswordSuccess("");
 
+    const isAdminRole = role === "admin";
+
     if (!newPassword || !confirmPassword) {
       setPasswordError("Vui lòng nhập đủ thông tin mật khẩu mới");
+      return;
+    }
+
+    if (isAdminRole && !currentPassword.trim()) {
+      setPasswordError("Vui lòng nhập mật khẩu hiện tại");
       return;
     }
 
@@ -73,8 +98,9 @@ export default function UserMenu({ userName, role, avatarInitial }: UserMenuProp
     try {
       await changeUserPassword({
         userId: session.userId,
-        currentPassword,
+        currentPassword: currentPassword.trim(),
         nextPassword: newPassword,
+        userRole: session.userRole,
       });
       setPasswordSuccess("Đổi mật khẩu thành công");
       setCurrentPassword("");
@@ -166,102 +192,107 @@ export default function UserMenu({ userName, role, avatarInitial }: UserMenuProp
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {isPasswordModalOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm"
-              onClick={closePasswordModal}
-            />
-
-            <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.98 }}
-              className="fixed inset-0 z-[130] flex items-center justify-center p-4"
-            >
-              <div className="w-full max-w-md bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-black text-gray-900">Đổi mật khẩu</h3>
-                    <p className="text-xs font-semibold text-gray-500">Cập nhật mật khẩu để đăng nhập thuận tiện hơn</p>
-                  </div>
-                  <button
-                    type="button"
+      {portalRoot
+        ? createPortal(
+            <AnimatePresence>
+              {isPasswordModalOpen && (
+                <>
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm"
                     onClick={closePasswordModal}
-                    className="p-2 rounded-xl text-gray-400 hover:bg-gray-100"
+                  />
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 16, scale: 0.98 }}
+                    className="fixed inset-0 z-[130] grid place-items-center p-4"
                   >
-                    <X size={18} />
-                  </button>
-                </div>
+                    <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-white rounded-3xl border border-gray-100 shadow-2xl p-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-lg font-black text-gray-900">Đổi mật khẩu</h3>
+                          <p className="text-xs font-semibold text-gray-500">Cập nhật mật khẩu để đăng nhập thuận tiện hơn</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={closePasswordModal}
+                          className="p-2 rounded-xl text-gray-400 hover:bg-gray-100"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
 
-                <div className="space-y-3">
-                  <label className="block text-xs font-bold text-gray-600">Mật khẩu hiện tại</label>
-                  <div className="relative">
-                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="password"
-                      value={currentPassword}
-                      onChange={(e) => setCurrentPassword(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                      placeholder="Nhập mật khẩu hiện tại"
-                    />
-                  </div>
+                      <div className="space-y-3">
+                        <label className="block text-xs font-bold text-gray-600">Mật khẩu hiện tại {role === "admin" ? "*" : "(không bắt buộc)"}</label>
+                        <div className="relative">
+                          <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="password"
+                            value={currentPassword}
+                            onChange={(e) => setCurrentPassword(e.target.value)}
+                            className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                            placeholder={role === "admin" ? "Nhập mật khẩu hiện tại" : "Có thể để trống"}
+                          />
+                        </div>
 
-                  <label className="block text-xs font-bold text-gray-600">Mật khẩu mới</label>
-                  <div className="relative">
-                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="password"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                      placeholder="Ít nhất 6 ký tự"
-                    />
-                  </div>
+                        <label className="block text-xs font-bold text-gray-600">Mật khẩu mới</label>
+                        <div className="relative">
+                          <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                            placeholder="Ít nhất 6 ký tự"
+                          />
+                        </div>
 
-                  <label className="block text-xs font-bold text-gray-600">Xác nhận mật khẩu mới</label>
-                  <div className="relative">
-                    <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                      placeholder="Nhập lại mật khẩu mới"
-                    />
-                  </div>
-                </div>
+                        <label className="block text-xs font-bold text-gray-600">Xác nhận mật khẩu mới</label>
+                        <div className="relative">
+                          <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="w-full rounded-xl border border-gray-200 py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                            placeholder="Nhập lại mật khẩu mới"
+                          />
+                        </div>
+                      </div>
 
-                {passwordError ? (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-                    {passwordError}
-                  </div>
-                ) : null}
+                      {passwordError ? (
+                        <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                          {passwordError}
+                        </div>
+                      ) : null}
 
-                {passwordSuccess ? (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-                    {passwordSuccess}
-                  </div>
-                ) : null}
+                      {passwordSuccess ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
+                          {passwordSuccess}
+                        </div>
+                      ) : null}
 
-                <button
-                  type="button"
-                  onClick={handlePasswordChange}
-                  disabled={changingPassword}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary text-white py-3 text-sm font-black disabled:opacity-60"
-                >
-                  {changingPassword ? <Loader2 size={16} className="animate-spin" /> : null}
-                  {changingPassword ? "Đang cập nhật..." : "Lưu mật khẩu mới"}
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+                      <button
+                        type="button"
+                        onClick={handlePasswordChange}
+                        disabled={changingPassword}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-primary text-white py-3 text-sm font-black disabled:opacity-60"
+                      >
+                        {changingPassword ? <Loader2 size={16} className="animate-spin" /> : null}
+                        {changingPassword ? "Đang cập nhật..." : "Lưu mật khẩu mới"}
+                      </button>
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>,
+            portalRoot
+          )
+        : null}
     </div>
   );
 }
