@@ -13,6 +13,12 @@ Production-focused Next.js application for autism intervention workflows:
 - Package manager: npm (lockfile-based install)
 - Framework: Next.js 16
 
+## Browser Compatibility
+
+- Default Next.js 16 baseline is modern browsers (Safari 16.4+).
+- Project now includes a legacy compatibility guard that routes older iOS/Safari devices to `/unsupported-browser` instead of failing with a blank page.
+- For debugging on old devices, append `?compat=allow` to bypass the guard temporarily.
+
 ## Project Structure
 
 - App Router root: `src/app`

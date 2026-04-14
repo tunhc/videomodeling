@@ -8,6 +8,20 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "browserslist": {
+    "production": [
+      "ios_saf >= 15",
+      "safari >= 15",
+      "chrome >= 96",
+      "edge >= 96",
+      "firefox >= 102"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "clsx": "^2.1.1",
