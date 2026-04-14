@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Play, ChevronRight, Video, CheckCircle2, Zap, Camera, MessageCircle, X, Loader2, Trash2, Calendar, Star, RefreshCw, Sparkles } from "lucide-react";
 import HPDTBrainCard from "@/components/hpdt/HPDTBrainCard";
@@ -23,6 +24,7 @@ interface Activity {
 }
 
 export default function ParentHome() {
+  const router = useRouter();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [tasks, setTasks] = useState<CollaborationTask[]>([]);
   const [showToast, setShowToast] = useState(false);
@@ -37,6 +39,19 @@ export default function ParentHome() {
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [generatingWeekly, setGeneratingWeekly] = useState(false);
   const [activeUploadTopic, setActiveUploadTopic] = useState("");
+
+  const openVideoReplay = (video: { id: string; url?: string }) => {
+    const url = typeof video.url === "string" ? video.url.trim() : "";
+    const isAbsoluteUrl = /^https?:\/\//i.test(url);
+
+    if (isAbsoluteUrl) {
+      window.open(url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    // Fallback: avoid opening a relative/invalid URL that triggers Next.js 404.
+    router.push(`/parent/analyze?id=${video.id}`);
+  };
 
   // 1. Load User Profile
   useEffect(() => {
@@ -102,16 +117,17 @@ export default function ParentHome() {
         });
         
         const formatted = list.map(v => {
+          const safeUrl = typeof v.url === "string" ? v.url : "";
           // Cloudinary auto-poster trick: change extension to .jpg or inject so/0 for first frame
-          const thumbnail = v.url.replace(/\.(mp4|mov|avi|wmv)$/, ".jpg");
+          const thumbnail = safeUrl.replace(/\.(mp4|mov|avi|wmv)$/, ".jpg");
 
           return {
             id: v.id,
-            title: cloudinaryService.extractPublicIdFromUrl(v.url),
+            title: cloudinaryService.extractPublicIdFromUrl(safeUrl),
             location: v.context === "school" ? "Tại Trường" : "Tại Nhà",
             time: v.createdAt?.toDate ? v.createdAt.toDate().toLocaleString("vi-VN") : "Gần đây",
             accuracy: v.status === "Đã phân tích" ? (v.hpdtAverages?.overall || 85) : 0,
-            url: v.url,
+            url: safeUrl,
             thumbnail: thumbnail,
             createdAt: v.createdAt
           };
@@ -313,7 +329,7 @@ export default function ParentHome() {
                   </button>
 
                   <div className="relative aspect-video bg-gray-100 flex items-center justify-center group cursor-pointer"
-                       onClick={() => window.open(video.url, '_blank')}>
+                       onClick={() => openVideoReplay(video)}>
                     <img 
                       src={video.thumbnail} 
                       alt={video.title} 

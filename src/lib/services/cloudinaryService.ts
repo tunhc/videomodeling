@@ -302,11 +302,45 @@ export const cloudinaryService = {
   },
 
   deobfuscateUrl(obfuscatedUrl: string) {
-    try {
-      return atob(obfuscatedUrl);
-    } catch {
-      return obfuscatedUrl;
+    if (!obfuscatedUrl || typeof obfuscatedUrl !== "string") return "";
+
+    const normalize = (url: string) => {
+      if (url.startsWith("//")) return `https:${url}`;
+      if (url.startsWith("res.cloudinary.com/")) return `https://${url}`;
+      return url;
+    };
+
+    const isAbsoluteOrCloudinary = (value: string) =>
+      /^https?:\/\//i.test(value) || value.startsWith("//") || value.startsWith("res.cloudinary.com/");
+
+    const raw = obfuscatedUrl.trim();
+    if (isAbsoluteOrCloudinary(raw)) {
+      return normalize(raw);
     }
+
+    const decode = (value: string) => {
+      try {
+        return atob(value).trim();
+      } catch {
+        return null;
+      }
+    };
+
+    const firstDecode = decode(raw);
+    if (firstDecode) {
+      if (isAbsoluteOrCloudinary(firstDecode)) {
+        return normalize(firstDecode);
+      }
+
+      // Support legacy/double-encoded payloads.
+      const secondDecode = decode(firstDecode);
+      if (secondDecode && isAbsoluteOrCloudinary(secondDecode)) {
+        return normalize(secondDecode);
+      }
+    }
+
+    // Keep raw value as last fallback so caller can decide alternate behavior.
+    return raw;
   },
 
   /**

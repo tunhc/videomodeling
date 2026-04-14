@@ -5,10 +5,12 @@ import { motion } from "framer-motion";
 import { AlertCircle, Brain, Target, UserCheck, Accessibility, Award } from "lucide-react";
 import HPDTRadar from "@/components/hpdt/HPDTRadar";
 import { db } from "@/lib/firebase";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { resolveLearnerForParent } from "@/lib/services/learnerService";
 
 export default function HPDTPage() {
   const [hpdtValue, setHpdtValue] = useState(75);
+  const [childName, setChildName] = useState("bé");
   const [skillData, setSkillData] = useState([
     { skill: "Nhận thức", value: 65, fullMark: 100 },
     { skill: "Giác quan", value: 85, fullMark: 100 },
@@ -19,25 +21,66 @@ export default function HPDTPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Listen for real-time updates to the child's digital twin
-    const unsub = onSnapshot(doc(db, "children", "minh-khoi"), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setHpdtValue(data.hpdt || 75);
-        
-        // Map dynamic variables from the most recent AI analyses
-        setSkillData([
-          { skill: "Nhận thức", value: data.cognitive || 65, fullMark: 100 },
-          { skill: "Giác quan", value: data.sensory || 85, fullMark: 100 },
-          { skill: "Vận động", value: data.motor || 75, fullMark: 100 },
-          { skill: "Hành vi", value: data.behavior || 60, fullMark: 100 },
-          { skill: "Xã hội", value: data.social || 90, fullMark: 100 },
-        ]);
-      }
-      setLoading(false);
-    });
+    let unsub: (() => void) | null = null;
+    let isActive = true;
 
-    return () => unsub();
+    async function bindLearner() {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+
+        const userSnap = await getDoc(doc(db, "users", userId));
+        const preferredChildId =
+          userSnap.exists() && typeof userSnap.data().childId === "string"
+            ? userSnap.data().childId
+            : undefined;
+
+        const learner = await resolveLearnerForParent(userId, preferredChildId);
+        if (!learner || !isActive) {
+          setLoading(false);
+          return;
+        }
+
+        setChildName(learner.name || "bé");
+
+        unsub = onSnapshot(doc(db, learner.source, learner.id), (docSnap) => {
+          if (!docSnap.exists()) {
+            setLoading(false);
+            return;
+          }
+
+          const data = docSnap.data();
+          setHpdtValue(data.hpdt || 75);
+          if (typeof data.name === "string" && data.name.trim()) {
+            setChildName(data.name);
+          }
+
+          // Map dynamic variables from the most recent AI analyses
+          setSkillData([
+            { skill: "Nhận thức", value: data.cognitive || 65, fullMark: 100 },
+            { skill: "Giác quan", value: data.sensory || 85, fullMark: 100 },
+            { skill: "Vận động", value: data.motor || 75, fullMark: 100 },
+            { skill: "Hành vi", value: data.behavior || 60, fullMark: 100 },
+            { skill: "Xã hội", value: data.social || 90, fullMark: 100 },
+          ]);
+
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error("Failed to load hpDT child:", error);
+        setLoading(false);
+      }
+    }
+
+    bindLearner();
+
+    return () => {
+      isActive = false;
+      if (unsub) unsub();
+    };
   }, []);
 
   const skillGrids = [
@@ -53,7 +96,7 @@ export default function HPDTPage() {
         <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100">
           <Brain size={24} className="text-primary" />
         </div>
-        <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">Bản sao số (hpDT) của Khôi</h1>
+        <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">Bản sao số (hpDT) của {childName}</h1>
       </header>
 
       {/* Main Gauge & Radar Section */}
