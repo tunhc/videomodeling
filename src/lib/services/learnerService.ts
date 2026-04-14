@@ -40,11 +40,20 @@ async function getLearnerByIdInCollection(source: LearnerSource, learnerId: stri
   return normalizeLearner(source, snap.id, snap.data() as Record<string, unknown>);
 }
 
-async function getLearnerByParentIdInCollection(source: LearnerSource, parentId: string) {
+async function getLearnerByParentIdInCollection(source: LearnerSource, parentId: string, preferredLearnerId?: string) {
   const snap = await getDocs(query(collection(db, source), where("parentId", "==", parentId)));
   if (snap.empty) return null;
-  const first = snap.docs[0];
-  return normalizeLearner(source, first.id, first.data() as Record<string, unknown>);
+
+  const learners = snap.docs.map((d) =>
+    normalizeLearner(source, d.id, d.data() as Record<string, unknown>)
+  );
+
+  if (preferredLearnerId) {
+    const preferred = learners.find((learner) => learner.id === preferredLearnerId);
+    if (preferred) return preferred;
+  }
+
+  return learners.sort((a, b) => a.name.localeCompare(b.name, "vi"))[0];
 }
 
 async function getLearnersByTeacherInCollection(source: LearnerSource, teacherId: string, isAdmin: boolean) {
@@ -74,21 +83,33 @@ export async function getLearnerByIdAnyCollection(learnerId: string) {
 }
 
 export async function resolveLearnerForParent(parentId: string, preferredChildId?: string) {
+  const legacyChildId = parentId.startsWith("PH_") ? parentId.replace("PH_", "") : undefined;
+
   if (preferredChildId) {
     const byPreferred = await getLearnerByIdAnyCollection(preferredChildId);
-    if (byPreferred) return byPreferred;
+    if (byPreferred && (!byPreferred.parentId || byPreferred.parentId === parentId)) {
+      return byPreferred;
+    }
   }
 
-  const byParentInChildren = await getLearnerByParentIdInCollection("children", parentId);
+  if (legacyChildId) {
+    const byLegacyId = await getLearnerByIdAnyCollection(legacyChildId);
+    if (byLegacyId && (!byLegacyId.parentId || byLegacyId.parentId === parentId)) {
+      return byLegacyId;
+    }
+  }
+
+  const preferredMatchId = preferredChildId || legacyChildId;
+
+  const byParentInChildren = await getLearnerByParentIdInCollection("children", parentId, preferredMatchId);
   if (byParentInChildren) return byParentInChildren;
 
-  const byParentInStudents = await getLearnerByParentIdInCollection("students", parentId);
+  const byParentInStudents = await getLearnerByParentIdInCollection("students", parentId, preferredMatchId);
   if (byParentInStudents) return byParentInStudents;
 
   // Last fallback for legacy IDs.
-  if (parentId.startsWith("PH_")) {
-    const fallbackId = parentId.replace("PH_", "");
-    return getLearnerByIdAnyCollection(fallbackId);
+  if (legacyChildId) {
+    return getLearnerByIdAnyCollection(legacyChildId);
   }
 
   return null;

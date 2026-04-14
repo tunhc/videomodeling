@@ -55,28 +55,65 @@ function routeForAccount(role: AppUserRole, userId: string): "/parent" | "/teach
   return "/teacher";
 }
 
+function buildParentChildInfo(parentId: string, learnerDoc: { id: string; data: () => Record<string, unknown> }) {
+  const data = learnerDoc.data();
+  return {
+    childId: learnerDoc.id,
+    displayName: typeof data.name === "string" ? `PH ${data.name}` : parentId,
+  };
+}
+
 async function findChildForParent(parentId: string) {
+  const expectedChildId = parentId.startsWith("PH_") ? parentId.replace("PH_", "") : "";
+
+  if (expectedChildId) {
+    const [exactInChildren, exactInStudents] = await Promise.all([
+      getDoc(doc(db, "children", expectedChildId)),
+      getDoc(doc(db, "students", expectedChildId)),
+    ]);
+
+    if (exactInChildren.exists()) {
+      const data = exactInChildren.data() as Record<string, unknown>;
+      if (!data.parentId || data.parentId === parentId) {
+        return buildParentChildInfo(parentId, {
+          id: exactInChildren.id,
+          data: () => data,
+        });
+      }
+    }
+
+    if (exactInStudents.exists()) {
+      const data = exactInStudents.data() as Record<string, unknown>;
+      if (!data.parentId || data.parentId === parentId) {
+        return buildParentChildInfo(parentId, {
+          id: exactInStudents.id,
+          data: () => data,
+        });
+      }
+    }
+  }
+
   const [inChildren, inStudents] = await Promise.all([
     getDocs(query(collection(db, "children"), where("parentId", "==", parentId))),
     getDocs(query(collection(db, "students"), where("parentId", "==", parentId))),
   ]);
 
   if (!inChildren.empty) {
-    const d = inChildren.docs[0];
-    const data = d.data() as Record<string, unknown>;
-    return {
-      childId: d.id,
-      displayName: typeof data.name === "string" ? `PH ${data.name}` : parentId,
-    };
+    const preferred = expectedChildId ? inChildren.docs.find((d) => d.id === expectedChildId) : undefined;
+    const chosen = preferred || [...inChildren.docs].sort((a, b) => a.id.localeCompare(b.id, "vi"))[0];
+    return buildParentChildInfo(parentId, {
+      id: chosen.id,
+      data: () => chosen.data() as Record<string, unknown>,
+    });
   }
 
   if (!inStudents.empty) {
-    const d = inStudents.docs[0];
-    const data = d.data() as Record<string, unknown>;
-    return {
-      childId: d.id,
-      displayName: typeof data.name === "string" ? `PH ${data.name}` : parentId,
-    };
+    const preferred = expectedChildId ? inStudents.docs.find((d) => d.id === expectedChildId) : undefined;
+    const chosen = preferred || [...inStudents.docs].sort((a, b) => a.id.localeCompare(b.id, "vi"))[0];
+    return buildParentChildInfo(parentId, {
+      id: chosen.id,
+      data: () => chosen.data() as Record<string, unknown>,
+    });
   }
 
   return null;
@@ -167,6 +204,21 @@ export async function loginWithUserIdPassword(input: { userId: string; password:
       password: input.password,
       updatedAt: serverTimestamp(),
     });
+  }
+
+  if (role === "parent") {
+    const childInfo = await findChildForParent(userId);
+    if (childInfo) {
+      const currentChildId = typeof data.childId === "string" ? data.childId : "";
+      const currentDisplayName = typeof data.displayName === "string" ? data.displayName : "";
+      if (currentChildId !== childInfo.childId || currentDisplayName !== childInfo.displayName) {
+        await updateDoc(userRef, {
+          childId: childInfo.childId,
+          displayName: childInfo.displayName,
+          updatedAt: serverTimestamp(),
+        });
+      }
+    }
   }
 
   return {

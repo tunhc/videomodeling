@@ -65,6 +65,7 @@ export default function ParentHome() {
         if (learner) {
           profile.childId = learner.id;
           profile.childName = learner.name;
+          profile.displayName = `PH ${learner.name}`;
           profile.teacherId = learner.teacherId || profile.teacherId;
         }
 
