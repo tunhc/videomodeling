@@ -217,11 +217,22 @@ export default function VideoUploadModal({
       }, 1500);
     } catch (error: any) {
       const message = typeof error?.message === "string" ? error.message : "Không xác định";
+      const messageLower = message.toLowerCase();
       if (message === "Upload canceled") {
         console.log("Upload canceled by user");
       } else {
         console.error("Upload failed:", error);
-        if (message.toLowerCase().includes("file size too large")) {
+        if (
+          messageLower.includes("network error") ||
+          messageLower.includes("timeout") ||
+          messageLower.includes("offline") ||
+          messageLower.includes("kết nối")
+        ) {
+          setUploadError(
+            "Kết nối mạng đang không ổn định nên tải lên bị gián đoạn. " +
+              "Vui lòng giữ màn hình sáng, chuyển sang Wi-Fi/4G ổn định và thử lại."
+          );
+        } else if (messageLower.includes("file size too large")) {
           if (hasClientUploadCap) {
             setUploadError(
               `Cloudinary từ chối file vượt giới hạn hiện tại (${displayMaxUploadMb}MB). ` +

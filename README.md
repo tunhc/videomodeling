@@ -67,6 +67,9 @@ Optional keys:
 
 - `NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID`
 - `NEXT_PUBLIC_CLOUDINARY_MAX_FILE_SIZE_MB` (set `> 0` to enforce client-side cap; leave empty to rely on Cloudinary preset/plan limits)
+- `NEXT_PUBLIC_CLOUDINARY_CHUNK_SIZE_MB` (chunk size in MB, default `5`)
+- `NEXT_PUBLIC_CLOUDINARY_REQUEST_TIMEOUT_MS` (request timeout in ms, default `45000`)
+- `NEXT_PUBLIC_CLOUDINARY_CHUNK_RETRY` (retry attempts per request/chunk, default `2`)
 - `NEXT_PUBLIC_ADMIN_USER_IDS` (comma-separated extra admin IDs; defaults already include `PH_admin,GV_admin`)
 
 ## Verify Before Merge
