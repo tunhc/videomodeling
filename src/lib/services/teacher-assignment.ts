@@ -77,6 +77,19 @@ export function extractTeacherIds(data: Record<string, unknown>) {
   // Optional generic fallback for datasets that store teacher entries in `teachers`.
   collected.push(...extractTeacherIdFromUnknown(data.teachers));
 
+  // Defensive parser for operational datasets that may use ad-hoc teacher columns
+  // such as GV / GV2 / teacher_2 / secondaryTeacher.
+  for (const [key, value] of Object.entries(data)) {
+    const normalizedKey = key.trim().toLowerCase();
+    const likelyTeacherKey =
+      normalizedKey === "gv" ||
+      /^gv\d+$/.test(normalizedKey) ||
+      normalizedKey.includes("teacher");
+
+    if (!likelyTeacherKey) continue;
+    collected.push(...extractTeacherIdFromUnknown(value));
+  }
+
   return mergeTeacherIds(collected);
 }
 

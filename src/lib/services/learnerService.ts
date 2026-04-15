@@ -104,6 +104,20 @@ async function getLearnersByTeacherInCollection(source: LearnerSource, teacherId
     }
   }
 
+  // Reliability fallback: load all learners and re-apply assignment filter in memory.
+  // This covers legacy imports where the secondary teacher is stored in non-indexed keys.
+  try {
+    const fullSnap = await getDocs(query(ref));
+    for (const item of fullSnap.docs) {
+      const data = item.data() as Record<string, unknown>;
+      if (isTeacherAssigned(data, teacherId)) {
+        docsById.set(item.id, data);
+      }
+    }
+  } catch (error) {
+    console.warn(`[LearnerService] Full-scan fallback failed for ${source}`, error);
+  }
+
   return Array.from(docsById.entries())
     .map(([id, data]) => normalizeLearner(source, id, data))
     .filter((learner) => isTeacherAssigned(learner as Record<string, unknown>, teacherId));
