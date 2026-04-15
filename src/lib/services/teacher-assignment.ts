@@ -20,7 +20,25 @@ function normalizeTeacherId(value: unknown) {
 }
 
 function canonicalTeacherId(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, "_");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+function buildCanonicalAliases(value: string) {
+  const canonical = canonicalTeacherId(value);
+  if (!canonical) return [];
+
+  const aliases = new Set<string>([canonical]);
+  const withoutTrailingDigits = canonical.replace(/(\D)\d+$/g, "$1");
+  if (withoutTrailingDigits && withoutTrailingDigits !== canonical) {
+    aliases.add(withoutTrailingDigits);
+  }
+
+  return Array.from(aliases);
 }
 
 function extractTeacherIdFromUnknown(value: unknown): string[] {
@@ -94,8 +112,11 @@ export function extractTeacherIds(data: Record<string, unknown>) {
 }
 
 export function isTeacherAssigned(data: Record<string, unknown>, teacherId: string) {
-  const expected = canonicalTeacherId(teacherId);
-  if (!expected) return false;
+  const expectedAliases = new Set(buildCanonicalAliases(teacherId));
+  if (expectedAliases.size === 0) return false;
 
-  return extractTeacherIds(data).some((assignedId) => canonicalTeacherId(assignedId) === expected);
+  return extractTeacherIds(data).some((assignedId) => {
+    const assignedAliases = buildCanonicalAliases(assignedId);
+    return assignedAliases.some((alias) => expectedAliases.has(alias));
+  });
 }
