@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { extractTeacherIds, isTeacherAssigned } from "@/lib/services/teacher-assignment";
 
 type LearnerSource = "children" | "students";
 
@@ -11,6 +12,7 @@ export interface LearnerRecord {
   hpdt: number;
   parentId?: string;
   teacherId?: string;
+  teacherIds?: string[];
   schoolCode?: string;
   source: LearnerSource;
   [key: string]: unknown;
@@ -19,6 +21,11 @@ export interface LearnerRecord {
 function normalizeLearner(source: LearnerSource, id: string, data: Record<string, unknown>): LearnerRecord {
   const name = typeof data.name === "string" && data.name.trim() ? data.name : "Học sinh không tên";
   const initialFromData = typeof data.initial === "string" && data.initial.trim() ? data.initial : "";
+  const teacherIds = extractTeacherIds(data);
+  const primaryTeacherId =
+    typeof data.teacherId === "string" && data.teacherId.trim()
+      ? data.teacherId
+      : teacherIds[0];
 
   return {
     id,
@@ -27,7 +34,8 @@ function normalizeLearner(source: LearnerSource, id: string, data: Record<string
     status: typeof data.status === "string" && data.status.trim() ? data.status : "Bình thường",
     hpdt: typeof data.hpdt === "number" ? data.hpdt : 0,
     parentId: typeof data.parentId === "string" ? data.parentId : undefined,
-    teacherId: typeof data.teacherId === "string" ? data.teacherId : undefined,
+    teacherId: primaryTeacherId,
+    teacherIds,
     schoolCode: typeof data.schoolCode === "string" ? data.schoolCode : undefined,
     source,
     ...data,
@@ -58,9 +66,47 @@ async function getLearnerByParentIdInCollection(source: LearnerSource, parentId:
 
 async function getLearnersByTeacherInCollection(source: LearnerSource, teacherId: string, isAdmin: boolean) {
   const ref = collection(db, source);
-  const q = isAdmin ? query(ref) : query(ref, where("teacherId", "==", teacherId));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => normalizeLearner(source, d.id, d.data() as Record<string, unknown>));
+
+  if (isAdmin) {
+    const snap = await getDocs(query(ref));
+    return snap.docs.map((d) => normalizeLearner(source, d.id, d.data() as Record<string, unknown>));
+  }
+
+  const queryCandidates = [
+    query(ref, where("teacherId", "==", teacherId)),
+    query(ref, where("teacherIds", "array-contains", teacherId)),
+    query(ref, where("secondaryTeacherId", "==", teacherId)),
+    query(ref, where("secondaryTeacherIds", "array-contains", teacherId)),
+    query(ref, where("coTeacherId", "==", teacherId)),
+    query(ref, where("coTeacherIds", "array-contains", teacherId)),
+    query(ref, where("assistantTeacherId", "==", teacherId)),
+    query(ref, where("assistantTeacherIds", "array-contains", teacherId)),
+    query(ref, where("supportTeacherId", "==", teacherId)),
+    query(ref, where("supportTeacherIds", "array-contains", teacherId)),
+  ];
+
+  const snapshots = await Promise.all(
+    queryCandidates.map(async (candidate) => {
+      try {
+        return await getDocs(candidate);
+      } catch (error) {
+        console.warn(`[LearnerService] Teacher query failed for ${source}`, error);
+        return null;
+      }
+    })
+  );
+
+  const docsById = new Map<string, Record<string, unknown>>();
+  for (const snap of snapshots) {
+    if (!snap) continue;
+    for (const item of snap.docs) {
+      docsById.set(item.id, item.data() as Record<string, unknown>);
+    }
+  }
+
+  return Array.from(docsById.entries())
+    .map(([id, data]) => normalizeLearner(source, id, data))
+    .filter((learner) => isTeacherAssigned(learner as Record<string, unknown>, teacherId));
 }
 
 function dedupeLearners(list: LearnerRecord[]) {

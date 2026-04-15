@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import type { AppUserRole } from "@/lib/auth-session";
 import { db } from "@/lib/firebase";
+import { getLearnersForTeacher } from "@/lib/services/learnerService";
 
 interface AppUserAuthRecord {
   displayName?: string;
@@ -120,11 +121,8 @@ async function findChildForParent(parentId: string) {
 }
 
 async function teacherHasAnyLearner(teacherId: string) {
-  const [inChildren, inStudents] = await Promise.all([
-    getDocs(query(collection(db, "children"), where("teacherId", "==", teacherId))),
-    getDocs(query(collection(db, "students"), where("teacherId", "==", teacherId))),
-  ]);
-  return !inChildren.empty || !inStudents.empty;
+  const learners = await getLearnersForTeacher(teacherId, "teacher");
+  return learners.length > 0;
 }
 
 async function bootstrapUserIfMissing(userId: string, password: string) {

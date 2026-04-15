@@ -20,6 +20,7 @@ export interface VideoMetadata {
   duration?: number; // Duration in seconds
   location?: string; // Tag địa điểm (trường, nhà...)
   teacherId?: string; // Teacher assigned to this child
+  teacherIds?: string[]; // All teachers allowed to access this video
   createdAt: any; // Firestore Timestamp
 }
 
@@ -74,6 +75,9 @@ export interface Child {
   diagnosis?: string;
   schoolCode: string;
   teacherId: string;
+  teacherIds?: string[];
+  secondaryTeacherId?: string;
+  secondaryTeacherIds?: string[];
   parentId: string;
   updatedAt: any;
 }
