@@ -13,10 +13,11 @@ import {
   Sparkles,
   Upload,
 } from "lucide-react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
 import { getAuthSession } from "@/lib/auth-session";
 import { db } from "@/lib/firebase";
 import { getLearnersForTeacher, type LearnerRecord } from "@/lib/services/learnerService";
+import { buildWordInsightsFromText } from "@/lib/word-insights";
 
 const DEFAULT_ADMIN_USER_IDS = ["PH_admin", "GV_admin"];
 const ADMIN_USER_IDS = new Set(
@@ -34,13 +35,19 @@ function isAdminIdentity(userId: string, role: string) {
 }
 
 type UploadResponse = {
-  documentId: string;
+  documentId?: string;
   childId: string;
   fileName: string;
-  version: number;
+  version?: number;
   wordCount: number;
   characterCount: number;
   preview: string;
+  extractedText?: string;
+  insights?: ReturnType<typeof buildWordInsightsFromText>;
+  mimeType?: string;
+  fileSize?: number;
+  persisted?: boolean;
+  requiresClientPersist?: boolean;
   parseWarnings: string[];
   createdAt: string;
 };
@@ -71,6 +78,121 @@ function formatDateTime(value: unknown) {
   const millis = toMillis(value);
   if (!millis) return "Vừa cập nhật";
   return new Date(millis).toLocaleString("vi-VN");
+}
+
+async function persistWordIntakeClientSide(input: {
+  payload: UploadResponse;
+  selectedChild: LearnerRecord;
+  adminId: string;
+  uploadedFile: File;
+}) {
+  const { payload, selectedChild, adminId, uploadedFile } = input;
+  const now = new Date();
+
+  const allChildDocsSnap = await getDocs(
+    query(collection(db, "child_documents"), where("childId", "==", selectedChild.id))
+  );
+
+  const nextVersion =
+    allChildDocsSnap.docs.filter((docSnap) => {
+      const data = docSnap.data() as Record<string, unknown>;
+      return typeof data.fileName === "string" && data.fileName === payload.fileName;
+    }).length + 1;
+
+  const extractedText = typeof payload.extractedText === "string" ? payload.extractedText : "";
+  const insights = payload.insights || buildWordInsightsFromText(extractedText);
+
+  const documentPayload = {
+    childId: selectedChild.id,
+    childName: selectedChild.name,
+    sourceType: "word_upload",
+    fileName: payload.fileName,
+    mimeType: payload.mimeType || uploadedFile.type || "application/octet-stream",
+    fileSize: payload.fileSize || uploadedFile.size,
+    version: nextVersion,
+    extractedText,
+    preview: payload.preview,
+    wordCount: payload.wordCount,
+    characterCount: payload.characterCount,
+    analysis: insights,
+    parseWarnings: payload.parseWarnings,
+    status: "parsed",
+    uploadedBy: adminId,
+    uploadedByRole: "admin",
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const newDocRef = await addDoc(collection(db, "child_documents"), documentPayload);
+
+  const latestWordDoc = {
+    docId: newDocRef.id,
+    fileName: payload.fileName,
+    version: nextVersion,
+    uploadedAt: now,
+    wordCount: payload.wordCount,
+    preview: payload.preview,
+  };
+
+  const latestWordInsights = {
+    sourceDocId: newDocRef.id,
+    fileName: payload.fileName,
+    updatedAt: now,
+    ...insights,
+  };
+
+  const childRef = doc(db, "children", selectedChild.id);
+  const childSnap = await getDoc(childRef);
+
+  if (childSnap.exists()) {
+    await setDoc(
+      childRef,
+      {
+        latestWordDoc,
+        latestWordInsights,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+  } else {
+    const studentRef = doc(db, "students", selectedChild.id);
+    const studentSnap = await getDoc(studentRef);
+    if (studentSnap.exists()) {
+      await setDoc(
+        studentRef,
+        {
+          latestWordDoc,
+          latestWordInsights,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+    }
+  }
+
+  await setDoc(
+    doc(db, "hpdt_stats", selectedChild.id),
+    {
+      childId: selectedChild.id,
+      latestWordInsights,
+      lastWordDocAt: now,
+      updatedAt: now,
+    },
+    { merge: true }
+  );
+
+  return {
+    documentId: newDocRef.id,
+    childId: selectedChild.id,
+    fileName: payload.fileName,
+    version: nextVersion,
+    wordCount: payload.wordCount,
+    characterCount: payload.characterCount,
+    preview: payload.preview,
+    parseWarnings: payload.parseWarnings,
+    createdAt: now.toISOString(),
+    persisted: true,
+  } satisfies UploadResponse;
 }
 
 export default function AdminWordIntakePage() {
@@ -201,7 +323,17 @@ export default function AdminWordIntakePage() {
         throw new Error(payload.error || "Không thể xử lý file Word.");
       }
 
-      setLastResult(payload);
+      let finalPayload = payload;
+      if (payload.requiresClientPersist) {
+        finalPayload = await persistWordIntakeClientSide({
+          payload,
+          selectedChild,
+          adminId,
+          uploadedFile: file,
+        });
+      }
+
+      setLastResult(finalPayload);
       setFile(null);
       await fetchDocuments(selectedChild.id);
     } catch (uploadError) {

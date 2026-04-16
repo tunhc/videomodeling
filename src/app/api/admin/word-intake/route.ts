@@ -61,9 +61,24 @@ function countWords(text: string) {
   return text.split(/\s+/).filter(Boolean).length;
 }
 
+type PersistBasePayload = {
+  childId: string;
+  childName: string;
+  fileName: string;
+  mimeType: string;
+  fileSize: number;
+  extractedText: string;
+  preview: string;
+  wordCount: number;
+  characterCount: number;
+  insights: ReturnType<typeof buildWordInsightsFromText>;
+  parseWarnings: string[];
+  uploadedBy: string;
+  uploadedByRole: string;
+};
+
 export async function POST(request: Request) {
   try {
-    const adminDb = getAdminDb();
     const formData = await request.formData();
     const childId = String(formData.get("childId") || "").trim();
     const childName = String(formData.get("childName") || "").trim();
@@ -112,6 +127,42 @@ export async function POST(request: Request) {
     }
 
     const now = new Date();
+    const preview = extracted.text.slice(0, 1200);
+    const wordCount = countWords(extracted.text);
+    const generatedInsights = buildWordInsightsFromText(extracted.text);
+
+    const basePayload: PersistBasePayload = {
+      childId,
+      childName,
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      fileSize: file.size,
+      extractedText: extracted.text,
+      preview,
+      wordCount,
+      characterCount: extracted.text.length,
+      insights: generatedInsights,
+      parseWarnings: extracted.warnings,
+      uploadedBy,
+      uploadedByRole,
+    };
+
+    let adminDb: ReturnType<typeof getAdminDb> | null = null;
+    try {
+      adminDb = getAdminDb();
+    } catch {
+      adminDb = null;
+    }
+
+    if (!adminDb) {
+      return NextResponse.json({
+        ...basePayload,
+        persisted: false,
+        requiresClientPersist: true,
+        createdAt: now.toISOString(),
+      });
+    }
+
     const allChildDocsSnap = await adminDb
       .collection("child_documents")
       .where("childId", "==", childId)
@@ -123,27 +174,23 @@ export async function POST(request: Request) {
         return typeof data.fileName === "string" && data.fileName === file.name;
       }).length + 1;
 
-    const preview = extracted.text.slice(0, 1200);
-    const wordCount = countWords(extracted.text);
-    const generatedInsights = buildWordInsightsFromText(extracted.text);
-
     const documentPayload = {
-      childId,
-      childName,
+      childId: basePayload.childId,
+      childName: basePayload.childName,
       sourceType: "word_upload",
-      fileName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      fileSize: file.size,
+      fileName: basePayload.fileName,
+      mimeType: basePayload.mimeType,
+      fileSize: basePayload.fileSize,
       version: nextVersion,
-      extractedText: extracted.text,
-      preview,
-      wordCount,
-      characterCount: extracted.text.length,
+      extractedText: basePayload.extractedText,
+      preview: basePayload.preview,
+      wordCount: basePayload.wordCount,
+      characterCount: basePayload.characterCount,
       analysis: generatedInsights,
-      parseWarnings: extracted.warnings,
+      parseWarnings: basePayload.parseWarnings,
       status: "parsed",
-      uploadedBy,
-      uploadedByRole,
+      uploadedBy: basePayload.uploadedBy,
+      uploadedByRole: basePayload.uploadedByRole,
       createdAt: now,
       updatedAt: now,
     };
@@ -216,6 +263,7 @@ export async function POST(request: Request) {
       preview,
       insights: latestWordInsights,
       parseWarnings: extracted.warnings,
+      persisted: true,
       createdAt: now.toISOString(),
     });
   } catch (error) {

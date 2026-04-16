@@ -31,6 +31,34 @@ function readServiceAccountFromEnv(): ServiceAccountLike | null {
   }
 }
 
+function readServiceAccountFromSplitEnv(): ServiceAccountLike | null {
+  const projectId =
+    process.env.FIREBASE_ADMIN_PROJECT_ID ||
+    process.env.FIREBASE_PROJECT_ID ||
+    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
+    '';
+
+  const clientEmail =
+    process.env.FIREBASE_ADMIN_CLIENT_EMAIL ||
+    process.env.FIREBASE_CLIENT_EMAIL ||
+    process.env.GOOGLE_CLIENT_EMAIL ||
+    '';
+
+  const privateKey =
+    process.env.FIREBASE_ADMIN_PRIVATE_KEY ||
+    process.env.FIREBASE_PRIVATE_KEY ||
+    process.env.GOOGLE_PRIVATE_KEY ||
+    '';
+
+  if (!projectId || !clientEmail || !privateKey) return null;
+
+  return {
+    project_id: projectId,
+    client_email: clientEmail,
+    private_key: privateKey.replace(/\\n/g, '\n'),
+  };
+}
+
 function readServiceAccountFromFile(): ServiceAccountLike | null {
   const keyPath = path.join(process.cwd(), 'serviceAccountKey.json');
   if (!fs.existsSync(keyPath)) return null;
@@ -52,7 +80,10 @@ function ensureAdminApp() {
 
   initAttempted = true;
 
-  const serviceAccount = readServiceAccountFromEnv() || readServiceAccountFromFile();
+  const serviceAccount =
+    readServiceAccountFromEnv() ||
+    readServiceAccountFromSplitEnv() ||
+    readServiceAccountFromFile();
   if (!serviceAccount) {
     console.warn('Firebase admin credential not found.');
     return null;
