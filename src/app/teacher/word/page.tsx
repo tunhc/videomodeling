@@ -99,17 +99,19 @@ export default function AdminWordIntakePage() {
     try {
       const docsSnap = await getDocs(query(collection(db, "child_documents"), where("childId", "==", childId)));
       const rows: ChildDocumentRecord[] = docsSnap.docs
-        .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as Record<string, unknown>) }))
-        .map((row) => ({
-          id: row.id as string,
-          fileName: typeof row.fileName === "string" ? row.fileName : "Tài liệu chưa đặt tên",
-          version: typeof row.version === "number" ? row.version : undefined,
-          wordCount: typeof row.wordCount === "number" ? row.wordCount : undefined,
-          characterCount: typeof row.characterCount === "number" ? row.characterCount : undefined,
-          preview: typeof row.preview === "string" ? row.preview : undefined,
-          uploadedBy: typeof row.uploadedBy === "string" ? row.uploadedBy : undefined,
-          createdAt: row.createdAt,
-        }))
+        .map((docSnap): ChildDocumentRecord => {
+          const data = docSnap.data() as Record<string, unknown>;
+          return {
+            id: docSnap.id,
+            fileName: typeof data.fileName === "string" ? data.fileName : "Tài liệu chưa đặt tên",
+            version: typeof data.version === "number" ? data.version : undefined,
+            wordCount: typeof data.wordCount === "number" ? data.wordCount : undefined,
+            characterCount: typeof data.characterCount === "number" ? data.characterCount : undefined,
+            preview: typeof data.preview === "string" ? data.preview : undefined,
+            uploadedBy: typeof data.uploadedBy === "string" ? data.uploadedBy : undefined,
+            createdAt: data.createdAt,
+          };
+        })
         .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
 
       setDocuments(rows);

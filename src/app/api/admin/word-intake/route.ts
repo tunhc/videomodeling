@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import * as mammoth from "mammoth";
-import { adminDb } from "@/lib/firebase-admin";
+import { getAdminDb } from "@/lib/firebase-admin";
 import { buildWordInsightsFromText } from "@/lib/word-insights";
 
 export const runtime = "nodejs";
@@ -63,6 +63,7 @@ function countWords(text: string) {
 
 export async function POST(request: Request) {
   try {
+    const adminDb = getAdminDb();
     const formData = await request.formData();
     const childId = String(formData.get("childId") || "").trim();
     const childName = String(formData.get("childName") || "").trim();
