@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
 import { getLearnersForTeacher } from "@/lib/services/learnerService";
+import { getAuthSession, type AppUserRole } from "@/lib/auth-session";
 
 interface Student {
   id: string;
@@ -24,6 +25,23 @@ interface School {
   city: string;
 }
 
+const DEFAULT_ADMIN_USER_IDS = ["PH_admin", "GV_admin"];
+const ADMIN_USER_IDS = new Set(
+  [
+    ...DEFAULT_ADMIN_USER_IDS,
+    ...(process.env.NEXT_PUBLIC_ADMIN_USER_IDS || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  ]
+);
+
+function resolveTeacherPageRole(userId: string, role: string): AppUserRole {
+  if (role === "admin" || ADMIN_USER_IDS.has(userId)) return "admin";
+  if (role === "parent") return "parent";
+  return "teacher";
+}
+
 export default function TeacherHome() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -35,9 +53,12 @@ export default function TeacherHome() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const userId = localStorage.getItem("userId") || "GV_DUONG_01";
-    const role = localStorage.getItem("userRole") || "teacher";
-    setUserRole(role);
+    const session = getAuthSession();
+    const userId = session?.userId || localStorage.getItem("userId") || "GV_DUONG_01";
+    const roleFromSession = session?.userRole || localStorage.getItem("userRole") || "teacher";
+    const resolvedRole = resolveTeacherPageRole(userId, roleFromSession);
+
+    setUserRole(resolvedRole);
 
     async function loadData() {
       try {
@@ -61,7 +82,7 @@ export default function TeacherHome() {
           }
         }
 
-        const learners = await getLearnersForTeacher(userId, role);
+        const learners = await getLearnersForTeacher(userId, resolvedRole);
         const list: Student[] = learners.map((learner) => ({
           id: learner.id,
           name: learner.name || "Học sinh không tên",
@@ -165,6 +186,27 @@ export default function TeacherHome() {
           </div>
         </div>
       </motion.div>
+
+      {userRole === "admin" && (
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.05 }}
+          className="bg-white border border-primary/20 rounded-[32px] p-6 shadow-soft flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        >
+          <div className="space-y-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary">Khu vực Admin</p>
+            <p className="text-sm font-bold text-gray-900">Cập nhật tài liệu Word để đồng bộ hpDT và bài can thiệp mới</p>
+          </div>
+          <Link
+            href="/teacher/word"
+            className="inline-flex items-center justify-center gap-2 px-5 h-11 rounded-2xl bg-primary text-white text-[10px] font-black uppercase tracking-widest shadow-hpdt"
+          >
+            <FileText size={16} />
+            Mở màn nạp tài liệu
+          </Link>
+        </motion.div>
+      )}
 
       {/* Quick Search */}
       <div className="relative group">

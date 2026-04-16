@@ -18,6 +18,21 @@ import { getAuthSession } from "@/lib/auth-session";
 import { db } from "@/lib/firebase";
 import { getLearnersForTeacher, type LearnerRecord } from "@/lib/services/learnerService";
 
+const DEFAULT_ADMIN_USER_IDS = ["PH_admin", "GV_admin"];
+const ADMIN_USER_IDS = new Set(
+  [
+    ...DEFAULT_ADMIN_USER_IDS,
+    ...(process.env.NEXT_PUBLIC_ADMIN_USER_IDS || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
+  ]
+);
+
+function isAdminIdentity(userId: string, role: string) {
+  return role === "admin" || ADMIN_USER_IDS.has(userId);
+}
+
 type UploadResponse = {
   documentId: string;
   childId: string;
@@ -108,17 +123,23 @@ export default function AdminWordIntakePage() {
 
   useEffect(() => {
     const session = getAuthSession();
-    if (!session) {
+    const legacyUserId = localStorage.getItem("userId") || "";
+    const legacyRole = localStorage.getItem("userRole") || "teacher";
+
+    const userId = session?.userId || legacyUserId;
+    const userRole = session?.userRole || legacyRole;
+
+    if (!session || !userId) {
       router.replace("/login");
       return;
     }
 
-    if (session.userRole !== "admin") {
+    if (!isAdminIdentity(userId, userRole)) {
       router.replace("/teacher");
       return;
     }
 
-    setAdminId(session.userId);
+    setAdminId(userId);
     setLoadingBoot(false);
   }, [router]);
 
