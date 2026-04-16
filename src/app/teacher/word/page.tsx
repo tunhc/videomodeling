@@ -11,9 +11,21 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  Trash2,
   Upload,
 } from "lucide-react";
-import { addDoc, collection, doc, getDoc, getDocs, query, setDoc, where } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  deleteField,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  where,
+} from "firebase/firestore";
 import { getAuthSession } from "@/lib/auth-session";
 import { db } from "@/lib/firebase";
 import { getLearnersForTeacher, type LearnerRecord } from "@/lib/services/learnerService";
@@ -78,6 +90,10 @@ function formatDateTime(value: unknown) {
   const millis = toMillis(value);
   if (!millis) return "Vừa cập nhật";
   return new Date(millis).toLocaleString("vi-VN");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 async function persistWordIntakeClientSide(input: {
@@ -202,6 +218,7 @@ export default function AdminWordIntakePage() {
   const [loadingChildren, setLoadingChildren] = useState(false);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null);
 
   const [adminId, setAdminId] = useState("");
   const [children, setChildren] = useState<LearnerRecord[]>([]);
@@ -341,6 +358,118 @@ export default function AdminWordIntakePage() {
       setError(message);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const updateLatestWordPointers = async (childId: string) => {
+    const now = new Date();
+    const docsSnap = await getDocs(query(collection(db, "child_documents"), where("childId", "==", childId)));
+
+    const childRef = doc(db, "children", childId);
+    const childSnap = await getDoc(childRef);
+
+    const applyToLearner = async (payload: Record<string, unknown>) => {
+      if (childSnap.exists()) {
+        await setDoc(childRef, payload, { merge: true });
+        return;
+      }
+
+      const studentRef = doc(db, "students", childId);
+      const studentSnap = await getDoc(studentRef);
+      if (studentSnap.exists()) {
+        await setDoc(studentRef, payload, { merge: true });
+      }
+    };
+
+    if (docsSnap.empty) {
+      await applyToLearner({
+        latestWordDoc: deleteField(),
+        latestWordInsights: deleteField(),
+        updatedAt: now,
+      });
+
+      await setDoc(
+        doc(db, "hpdt_stats", childId),
+        {
+          latestWordInsights: deleteField(),
+          lastWordDocAt: deleteField(),
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+      return;
+    }
+
+    const latestDoc = docsSnap.docs
+      .map((docSnap) => ({ id: docSnap.id, data: docSnap.data() as Record<string, unknown> }))
+      .sort((a, b) => toMillis(b.data.createdAt) - toMillis(a.data.createdAt))[0];
+
+    const latestData = latestDoc.data;
+    const latestWordDoc = {
+      docId: latestDoc.id,
+      fileName: typeof latestData.fileName === "string" ? latestData.fileName : "Tài liệu chưa đặt tên",
+      version: typeof latestData.version === "number" ? latestData.version : 1,
+      uploadedAt: latestData.createdAt || now,
+      wordCount: typeof latestData.wordCount === "number" ? latestData.wordCount : 0,
+      preview: typeof latestData.preview === "string" ? latestData.preview : "",
+    };
+
+    const extractedText = typeof latestData.extractedText === "string" ? latestData.extractedText : "";
+    const analysis = isRecord(latestData.analysis)
+      ? latestData.analysis
+      : extractedText
+      ? (buildWordInsightsFromText(extractedText) as Record<string, unknown>)
+      : null;
+
+    const learnerPayload: Record<string, unknown> = {
+      latestWordDoc,
+      updatedAt: now,
+    };
+
+    const statsPayload: Record<string, unknown> = {
+      updatedAt: now,
+    };
+
+    if (analysis) {
+      const latestWordInsights = {
+        sourceDocId: latestDoc.id,
+        fileName: latestWordDoc.fileName,
+        updatedAt: now,
+        ...analysis,
+      };
+
+      learnerPayload.latestWordInsights = latestWordInsights;
+      statsPayload.latestWordInsights = latestWordInsights;
+      statsPayload.lastWordDocAt = now;
+    } else {
+      learnerPayload.latestWordInsights = deleteField();
+      statsPayload.latestWordInsights = deleteField();
+      statsPayload.lastWordDocAt = deleteField();
+    }
+
+    await applyToLearner(learnerPayload);
+    await setDoc(doc(db, "hpdt_stats", childId), statsPayload, { merge: true });
+  };
+
+  const handleDeleteDocument = async (docId: string, fileName: string) => {
+    if (!selectedChildId) return;
+    const confirmed = window.confirm(`Bạn có chắc muốn xóa tài liệu \"${fileName}\"?`);
+    if (!confirmed) return;
+
+    setDeletingDocId(docId);
+    setError("");
+    try {
+      await deleteDoc(doc(db, "child_documents", docId));
+      await updateLatestWordPointers(selectedChildId);
+      if (lastResult?.documentId === docId) {
+        setLastResult(null);
+      }
+      await fetchDocuments(selectedChildId);
+    } catch (deleteError) {
+      const message = deleteError instanceof Error ? deleteError.message : "Không xác định";
+      setError(`Xóa tài liệu thất bại: ${message}`);
+    } finally {
+      setDeletingDocId(null);
     }
   };
 
@@ -499,6 +628,17 @@ export default function AdminWordIntakePage() {
                         {(doc.wordCount || 0).toLocaleString("vi-VN")} từ
                       </p>
                     </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => handleDeleteDocument(doc.id, doc.fileName)}
+                      disabled={deletingDocId === doc.id}
+                      className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border border-red-200 text-[10px] font-black uppercase tracking-widest text-red-600 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {deletingDocId === doc.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                      {deletingDocId === doc.id ? "Đang xóa" : "Xóa tài liệu"}
+                    </button>
                   </div>
 
                   {doc.preview ? (
