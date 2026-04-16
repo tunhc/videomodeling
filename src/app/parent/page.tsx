@@ -15,12 +15,23 @@ import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { generateWeeklyScheduleAction } from "@/app/actions/gemini";
 import { cloudinaryService } from "@/lib/services/cloudinaryService";
 import { resolveLearnerForParent } from "@/lib/services/learnerService";
+import {
+  formatFirestoreLikeDate,
+  normalizeWordInsights,
+  type LatestWordInsights,
+} from "@/lib/word-insights";
 
 interface Activity {
   title: string;
   description: string;
   domain: string;
   requiresModeling: boolean;
+}
+
+function priorityLabel(priority: "high" | "medium" | "low") {
+  if (priority === "high") return "Ưu tiên cao";
+  if (priority === "medium") return "Ưu tiên vừa";
+  return "Theo dõi";
 }
 
 export default function ParentHome() {
@@ -39,6 +50,7 @@ export default function ParentHome() {
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [generatingWeekly, setGeneratingWeekly] = useState(false);
   const [activeUploadTopic, setActiveUploadTopic] = useState("");
+  const [wordInsights, setWordInsights] = useState<LatestWordInsights | null>(null);
 
   const openVideoReplay = (video: { id: string; url?: string }) => {
     const url = typeof video.url === "string" ? video.url.trim() : "";
@@ -82,6 +94,7 @@ export default function ParentHome() {
           profile.childName = learner.name;
           profile.displayName = `PH ${learner.name}`;
           profile.teacherId = learner.teacherId || profile.teacherId;
+          setWordInsights(normalizeWordInsights(learner.latestWordInsights));
         }
 
         setUserProfile(profile);
@@ -281,6 +294,45 @@ export default function ParentHome() {
 
       <main className="px-8 space-y-10 mt-6">
         <HPDTBrainCard value={userProfile?.hpdt || 75} status="Đang tiến hóa" emotion="Vui vẻ" lastUpdate="Vừa xong" />
+
+        <section className="space-y-5">
+          <div className="flex items-center justify-between gap-4">
+            <h3 className="text-lg font-black text-gray-900 tracking-tight">Bài học can thiệp mới từ hồ sơ Word</h3>
+            {wordInsights ? (
+              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                {formatFirestoreLikeDate(wordInsights.updatedAt)}
+              </span>
+            ) : null}
+          </div>
+
+          {wordInsights && wordInsights.interventionLessons.length > 0 ? (
+            <div className="space-y-4">
+              <div className="rounded-[28px] border border-primary/15 bg-primary/5 p-5 space-y-2">
+                <p className="text-[10px] uppercase tracking-widest font-black text-primary">Tổng quan từ hồ sơ</p>
+                <p className="text-sm font-bold text-gray-800 leading-relaxed">
+                  {wordInsights.summary || "Hệ thống đã đọc tài liệu Word và tạo danh sách bài can thiệp mới."}
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {wordInsights.interventionLessons.slice(0, 4).map((lesson, index) => (
+                  <ActivityItem
+                    key={`${lesson.title}-${index}`}
+                    title={lesson.title}
+                    location={`${lesson.domain} • ${priorityLabel(lesson.priority)}`}
+                    duration="Bài mới từ hồ sơ"
+                    isCompleted={false}
+                    onUpload={() => startUpload(lesson.title)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white rounded-[28px] p-6 border border-dashed border-gray-200 text-center text-sm text-gray-400 font-semibold">
+              Chưa có bài can thiệp mới từ hồ sơ Word. Sau khi Admin nạp tài liệu, hệ thống sẽ tự động cập nhật tại đây.
+            </div>
+          )}
+        </section>
 
         {tasks.map((task) => (
           <motion.div

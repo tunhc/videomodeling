@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Search, QrCode, TrendingUp, Upload, MessageCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import { Search, QrCode, TrendingUp, Upload, MessageCircle, FileText } from "lucide-react";
 import VideoUploadModal from "@/components/VideoUploadModal";
 import UserMenu from "@/components/layout/UserMenu";
 import { db } from "@/lib/firebase";
@@ -107,7 +107,7 @@ export default function TeacherHome() {
           role={userRole} 
           avatarInitial="AI"
         />
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           <div className="text-right hidden sm:block">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest leading-none">
               {school?.centerCode || "KBC"}
@@ -116,6 +116,15 @@ export default function TeacherHome() {
               {school?.schoolName || "Đang tải..."}
             </p>
           </div>
+          {userRole === "admin" && (
+            <Link
+              href="/teacher/word"
+              className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100 text-gray-400 hover:text-primary transition-all"
+              title="Nạp hồ sơ Word"
+            >
+              <FileText size={24} />
+            </Link>
+          )}
           <Link
             href="/teacher/instruction"
             className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100 text-gray-400 hover:text-primary transition-all"

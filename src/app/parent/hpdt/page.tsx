@@ -2,15 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { AlertCircle, Brain, Target, UserCheck, Accessibility, Award } from "lucide-react";
+import { AlertCircle, Brain, Target, UserCheck, Accessibility, Award, FileText, Sparkles } from "lucide-react";
 import HPDTRadar from "@/components/hpdt/HPDTRadar";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { resolveLearnerForParent } from "@/lib/services/learnerService";
+import {
+  formatFirestoreLikeDate,
+  normalizeWordInsights,
+  type LatestWordInsights,
+} from "@/lib/word-insights";
 
 export default function HPDTPage() {
   const [hpdtValue, setHpdtValue] = useState(75);
   const [childName, setChildName] = useState("bé");
+  const [wordInsights, setWordInsights] = useState<LatestWordInsights | null>(null);
   const [skillData, setSkillData] = useState([
     { skill: "Nhận thức", value: 65, fullMark: 100 },
     { skill: "Giác quan", value: 85, fullMark: 100 },
@@ -58,6 +64,8 @@ export default function HPDTPage() {
             setChildName(data.name);
           }
 
+          setWordInsights(normalizeWordInsights(data.latestWordInsights));
+
           // Map dynamic variables from the most recent AI analyses
           setSkillData([
             { skill: "Nhận thức", value: data.cognitive || 65, fullMark: 100 },
@@ -89,6 +97,14 @@ export default function HPDTPage() {
     { label: "XÃ HỘI", status: "Tiến bộ", color: "text-green-600", bg: "bg-green-50/50", icon: Accessibility },
     { label: "VẬN ĐỘNG", status: "Tốt", color: "text-orange-600", bg: "bg-orange-50/50", icon: Award },
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-calming-bg flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-10 bg-calming-bg min-h-screen pb-32">
@@ -154,6 +170,90 @@ export default function HPDTPage() {
           ))}
         </div>
       </motion.div>
+
+      <motion.section
+        initial={{ y: 26, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="bg-white border border-gray-100 rounded-[32px] p-8 space-y-6"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+              <FileText size={18} />
+            </div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary">Word Intake</p>
+              <h3 className="text-lg font-black text-gray-900">Tổng quan chỉ số từ hồ sơ Word</h3>
+            </div>
+          </div>
+          {wordInsights ? (
+            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
+              {formatFirestoreLikeDate(wordInsights.updatedAt)}
+            </span>
+          ) : null}
+        </div>
+
+        {wordInsights ? (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Tổng quan</p>
+                <p className="text-2xl font-black text-indigo-900 mt-1">{wordInsights.indicators.overall}%</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Tin cậy</p>
+                <p className="text-2xl font-black text-emerald-900 mt-1">{wordInsights.indicators.confidence}%</p>
+              </div>
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 col-span-2 sm:col-span-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-amber-500">Nguồn</p>
+                <p className="text-xs font-bold text-amber-900 mt-2 line-clamp-2">
+                  {wordInsights.fileName || "Hồ sơ Word mới nhất"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { label: "Giao tiếp", value: wordInsights.indicators.communication },
+                { label: "Xã hội", value: wordInsights.indicators.social },
+                { label: "Hành vi", value: wordInsights.indicators.behavior },
+                { label: "Giác quan", value: wordInsights.indicators.sensory },
+                { label: "Vận động", value: wordInsights.indicators.motor },
+              ].map((item) => (
+                <div key={item.label} className="rounded-2xl border border-gray-100 p-4">
+                  <div className="flex items-center justify-between text-xs font-bold text-gray-500">
+                    <span>{item.label}</span>
+                    <span>{item.value}%</span>
+                  </div>
+                  <div className="mt-2 h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-full bg-primary rounded-full" style={{ width: `${item.value}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {wordInsights.interventionLessons.length > 0 ? (
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4 space-y-3">
+                <div className="flex items-center gap-2 text-primary">
+                  <Sparkles size={16} />
+                  <p className="text-[10px] font-black uppercase tracking-widest">Bài can thiệp gợi ý từ hồ sơ</p>
+                </div>
+                <ul className="space-y-2">
+                  {wordInsights.interventionLessons.slice(0, 3).map((lesson, index) => (
+                    <li key={`${lesson.title}-${index}`} className="text-sm text-gray-700">
+                      <strong className="text-gray-900">{lesson.title}:</strong> {lesson.description}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-6 text-sm font-semibold text-gray-400 text-center">
+            Chưa có dữ liệu hồ sơ Word cho bé này. Sau khi Admin nạp tài liệu, chỉ số sẽ xuất hiện ở đây.
+          </div>
+        )}
+      </motion.section>
 
       {/* VST Transfer Notes Card */}
       <motion.div 
