@@ -395,7 +395,7 @@ export default function BackendLibraryIntakePage() {
                     </p>
                     
                     <div className="flex flex-col gap-2">
-                      {(docItem.foundExercises?.length ?? 0) > 0 && (
+                      {docItem.foundExercises && docItem.foundExercises.length > 0 && (
                         <div className="flex flex-wrap gap-2">
                           {docItem.foundExercises.map((ex, idx) => (
                             <span key={idx} className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-100">
@@ -405,7 +405,7 @@ export default function BackendLibraryIntakePage() {
                         </div>
                       )}
                       
-                      {(docItem.behaviors?.length ?? 0) > 0 && (
+                      {docItem.behaviors && docItem.behaviors.length > 0 && (
                         <div className="mt-1 flex flex-col gap-1">
                           <p className="text-xs font-bold text-amber-600 uppercase tracking-widest">{docItem.behaviors.length} hành vi / mốc ghi nhận</p>
                           <div className="flex flex-wrap gap-1.5">
@@ -418,7 +418,7 @@ export default function BackendLibraryIntakePage() {
                         </div>
                       )}
 
-                      {(!docItem.foundExercises?.length && !docItem.behaviors?.length) && (
+                      {(!docItem.foundExercises?.length && (!docItem.behaviors || docItem.behaviors.length === 0)) && (
                         <span className="inline-block px-2.5 py-1 bg-gray-100 text-gray-500 text-xs font-semibold rounded-lg self-start">
                           Chưa có insights
                         </span>
