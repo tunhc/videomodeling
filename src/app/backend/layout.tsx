@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { getAuthSession, clearAuthSession } from "@/lib/auth-session";
 import { doc, getDoc } from "firebase/firestore";
+import { signInAnonymously } from "firebase/auth";
 import Link from "next/link";
 import { LayoutDashboard, Users, Settings, LogOut, Menu, X, ShieldAlert, Video, Activity } from "lucide-react";
 
@@ -60,6 +61,15 @@ export default function BackendLayout({ children }: { children: React.ReactNode 
         const data = userDocSnap.data();
         const role = (data.role || session.userRole || "").toLowerCase();
         setActiveUserRole(role);
+
+        // Sync with Firebase Auth for Storage permissions
+        if (!auth.currentUser) {
+          try {
+            await signInAnonymously(auth);
+          } catch (syncErr) {
+            console.error("Layout Auth Sync error:", syncErr);
+          }
+        }
 
         // RBAC Access Guard
         if (!["admin", "professor", "projectmanager"].includes(role)) {
