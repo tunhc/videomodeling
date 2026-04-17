@@ -54,8 +54,12 @@ export default function RootLayout({
     <html
       lang="vi"
       className={`${lexend.variable} h-full antialiased font-lexend`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body 
+        className="min-h-full flex flex-col bg-background text-foreground"
+        suppressHydrationWarning
+      >
         <Script id="legacy-browser-guard" strategy="beforeInteractive">
           {LEGACY_BROWSER_GUARD}
         </Script>

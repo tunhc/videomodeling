@@ -40,7 +40,13 @@ export default function LoginPage() {
       });
 
       const fallbackPath = routeForRole(authResult.role);
-      const targetPath = authResult.homePath || fallbackPath;
+      let targetPath = authResult.homePath || (fallbackPath as any);
+
+      // Explicitly redirect specific admin/management IDs to the backend
+      const backendSpecificIds = ["admin_tech", "pm_Nhi", "ipm_AN", "CG_KBC_Binh", "CG_NBAI_Linh"];
+      if (backendSpecificIds.includes(authResult.userId)) {
+        targetPath = "/backend";
+      }
 
       setAuthSession({
         userRole: authResult.role,

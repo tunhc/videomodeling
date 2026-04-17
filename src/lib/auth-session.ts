@@ -1,11 +1,11 @@
-export type AppUserRole = "admin" | "teacher" | "parent";
+export type AppUserRole = "admin" | "teacher" | "parent" | "professor" | "projectmanager";
 
 export interface AuthSession {
   userId: string;
   userRole: AppUserRole;
   remember: boolean;
   expiresAt: number;
-  homePath?: "/parent" | "/teacher";
+  homePath?: "/parent" | "/teacher" | "/backend";
 }
 
 const SESSION_KEY = "ai4autism.auth.session";
@@ -24,7 +24,7 @@ export function setAuthSession(input: {
   userId: string;
   userRole: AppUserRole;
   remember?: boolean;
-  homePath?: "/parent" | "/teacher";
+  homePath?: "/parent" | "/teacher" | "/backend";
 }) {
   if (!isBrowser()) return;
 
@@ -89,11 +89,12 @@ export function getAuthSession(): AuthSession | null {
   }
 }
 
-export function routeForRole(role: AppUserRole): "/parent" | "/teacher" {
+export function routeForRole(role: AppUserRole): "/parent" | "/teacher" | "/backend" {
+  if (role === "admin" || role === "professor" || role === "projectmanager") return "/backend";
   return role === "parent" ? "/parent" : "/teacher";
 }
 
-export function routeForSession(session: AuthSession): "/parent" | "/teacher" {
+export function routeForSession(session: AuthSession): "/parent" | "/teacher" | "/backend" {
   if (session.homePath) return session.homePath;
   return routeForRole(session.userRole);
 }
