@@ -2,6 +2,7 @@ export type AppUserRole = "admin" | "teacher" | "parent" | "professor" | "projec
 
 export interface AuthSession {
   userId: string;
+  userName?: string;
   userRole: AppUserRole;
   remember: boolean;
   expiresAt: number;
@@ -22,6 +23,7 @@ function isBrowser() {
 
 export function setAuthSession(input: {
   userId: string;
+  userName?: string;
   userRole: AppUserRole;
   remember?: boolean;
   homePath?: "/parent" | "/teacher" | "/backend";
@@ -33,6 +35,7 @@ export function setAuthSession(input: {
 
   const session: AuthSession = {
     userId: input.userId,
+    userName: input.userName,
     userRole: input.userRole,
     remember,
     expiresAt,

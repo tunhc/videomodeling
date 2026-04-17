@@ -56,7 +56,7 @@ export default function BackendDashboardPage() {
         // Leaderboard calculation
         const childVideoCounts: Record<string, number> = {};
         videoData.forEach((v: any) => {
-          const cid = v.childid || v.childId;
+          const cid = v.childId;
           if (cid) childVideoCounts[cid] = (childVideoCounts[cid] || 0) + 1;
         });
 
@@ -100,7 +100,7 @@ export default function BackendDashboardPage() {
       filtered = filtered.filter(v => (v.createdAt?.toDate?.() || new Date(v.createdAt)) <= e);
     }
     if (filterChildId) {
-      filtered = filtered.filter(v => (v.childid || v.childId) === filterChildId);
+      filtered = filtered.filter(v => v.childId === filterChildId);
     }
 
     const grouped = new Map<string, { parent: number, teacher: number, name: string }>();

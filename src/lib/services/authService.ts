@@ -43,16 +43,16 @@ function normalizeRole(role: unknown, userId: string): AppUserRole {
   }
 
   const normalized = typeof role === "string" ? role.toLowerCase() : "";
-  if (normalized === "parent" || normalized === "teacher" || normalized === "admin") {
-    return normalized;
+  if (normalized === "parent" || normalized === "teacher" || normalized === "admin" || normalized === "professor" || normalized === "projectmanager") {
+    return normalized as AppUserRole;
   }
 
   return userId.startsWith("PH_") ? "parent" : "teacher";
 }
 
-function routeForAccount(role: AppUserRole, userId: string): "/parent" | "/teacher" {
+function routeForAccount(role: AppUserRole, userId: string): "/parent" | "/teacher" | "/backend" {
+  if (role === "admin" || role === "professor" || role === "projectmanager") return "/backend";
   if (role === "parent") return "/parent";
-  if (role === "admin" && userId.startsWith("PH_")) return "/parent";
   return "/teacher";
 }
 
@@ -221,6 +221,7 @@ export async function loginWithUserIdPassword(input: { userId: string; password:
 
   return {
     userId,
+    displayName: data.displayName || userId,
     role,
     homePath: routeForAccount(role, userId),
   };
