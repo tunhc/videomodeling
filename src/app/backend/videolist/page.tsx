@@ -5,7 +5,7 @@ import {
   collection, getDocs, query, orderBy, doc, getDoc, 
   addDoc, serverTimestamp, setDoc, deleteDoc 
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, listAll, deleteObject, uploadBytesResumable } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { getAuthSession } from "@/lib/auth-session";
 import { 
@@ -64,10 +64,10 @@ export default function VideoListPage() {
   const [plans, setPlans] = useState<InterventionPlan[]>([]);
   const [notes, setNotes] = useState<ProfessorNote[]>([]);
   const [newNote, setNewNote] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingPlan, setUploadingPlan] = useState(false);
   const [previewFileUrl, setPreviewFileUrl] = useState<string | null>(null);
   const [videoPlayerUrl, setVideoPlayerUrl] = useState<string | null>(null);
-  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const decodeBase64 = (str: string) => {
@@ -197,29 +197,44 @@ export default function VideoListPage() {
     if (!file || !selectedChildId) return;
 
     setUploadingPlan(true);
+    setUploadProgress(0);
+    
     try {
       const session = getAuthSession();
       const storageRef = ref(storage, `intervention_plans/${selectedChildId}/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const downloadURL = await getDownloadURL(storageRef);
+      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      const planData = {
-        childId: selectedChildId,
-        name: file.name,
-        url: downloadURL,
-        uploadedAt: serverTimestamp(),
-        uploaderId: session?.userId || "unknown",
-        uploaderName: session?.userName || "Chuyên gia"
-      };
+      uploadTask.on('state_changed', 
+        (snapshot: any) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        }, 
+        (error: Error) => {
+          console.error("Upload error:", error);
+          alert("Lỗi khi tải file lên: " + error.message);
+          setUploadingPlan(false);
+        }, 
+        async () => {
+          const downloadURL = await getDownloadURL(storageRef);
+          const planData = {
+            childId: selectedChildId,
+            name: file.name,
+            url: downloadURL,
+            uploadedAt: serverTimestamp(),
+            uploaderId: session?.userId || "unknown",
+            uploaderName: session?.userName || "Chuyên gia"
+          };
 
-      const docRef = await addDoc(collection(db, "intervention_plans"), planData);
-      setPlans([{ id: docRef.id, ...planData, uploadedAt: new Date() } as any, ...plans]);
-      
-      if (fileInputRef.current) fileInputRef.current.value = "";
+          const docRef = await addDoc(collection(db, "intervention_plans"), planData);
+          setPlans(prev => [{ id: docRef.id, ...planData, uploadedAt: new Date() } as any, ...prev]);
+          
+          if (fileInputRef.current) fileInputRef.current.value = "";
+          setUploadingPlan(false);
+          setUploadProgress(100);
+        }
+      );
     } catch (err) {
-      console.error("Upload error:", err);
-      alert("Lỗi khi tải file lên.");
-    } finally {
+      console.error("Unexpected upload error:", err);
       setUploadingPlan(false);
     }
   };
@@ -483,10 +498,19 @@ export default function VideoListPage() {
                         className="px-5 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase flex items-center gap-2 shadow-lg shadow-indigo-600/20 hover:scale-105 transition-all"
                       >
                          <Upload className="w-4 h-4" />
-                         {uploadingPlan ? 'Đang tải...' : 'Upload Word'}
+                         {uploadingPlan ? `Đang tải ${Math.round(uploadProgress)}%` : 'Upload Word'}
                       </button>
                       <input type="file" ref={fileInputRef} className="hidden" accept=".doc,.docx" onChange={handleUploadPlan} />
                    </div>
+
+                   {uploadingPlan && (
+                       <div className="mb-6 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                          <div 
+                             className="bg-indigo-600 h-full transition-all duration-300"
+                             style={{ width: `${uploadProgress}%` }}
+                          />
+                       </div>
+                    )}
 
                    {loadingDetail ? (
                       <div className="space-y-4">
