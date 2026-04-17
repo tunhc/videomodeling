@@ -17,7 +17,7 @@ export default function InstructionPage() {
   const [selectedChild, setSelectedChild] = useState<any>(null);
   const [fetching, setFetching] = useState(true);
 
-  const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") || "GV_DUONG_01" : "GV_DUONG_01";
+  const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") || "" : "";
   const userRole = typeof window !== 'undefined' ? localStorage.getItem("userRole") || "teacher" : "teacher";
   const [teacherName, setTeacherName] = useState("Giáo viên");
 

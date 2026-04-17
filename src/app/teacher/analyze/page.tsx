@@ -270,7 +270,7 @@ function AnalyzeContent() {
       await addDoc(collection(db, "video_analysis"), {
         videoId: selectedVideo.id,
         childId: selectedVideo.childId,
-        teacherId: "GV_DUONG_01",
+        teacherId: typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "",
         milestones,
         hpdtAverages: hpdtResults,
         finalSuccessRate: hpdtResults.overall,

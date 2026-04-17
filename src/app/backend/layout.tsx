@@ -211,9 +211,8 @@ export default function BackendLayout({ children }: { children: React.ReactNode 
         </header>
 
         {/* Page Content View */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 lg:p-10 custom-scrollbar relative">
-          <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-white to-transparent pointer-events-none" />
-          <div className="max-w-7xl mx-auto relative z-10">
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 lg:p-10 custom-scrollbar">
+          <div className="max-w-7xl mx-auto">
             {children}
           </div>
         </main>

@@ -2,23 +2,14 @@ import { NextResponse } from "next/server";
 import * as mammoth from "mammoth";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { buildWordInsightsFromText } from "@/lib/word-insights";
+import { isAdminId } from "@/lib/constants";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE_BYTES = 15 * 1024 * 1024;
-const DEFAULT_ADMIN_USER_IDS = ["PH_admin", "GV_admin"];
-const ADMIN_USER_IDS = new Set(
-  [
-    ...DEFAULT_ADMIN_USER_IDS,
-    ...(process.env.NEXT_PUBLIC_ADMIN_USER_IDS || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
-  ]
-);
 
 function isAdminUser(userId: string) {
-  return ADMIN_USER_IDS.has(userId);
+  return isAdminId(userId);
 }
 
 function normalizeExtractedText(text: string) {

@@ -12,6 +12,7 @@ import {
 import type { AppUserRole } from "@/lib/auth-session";
 import { db } from "@/lib/firebase";
 import { getLearnersForTeacher } from "@/lib/services/learnerService";
+import { isAdminId } from "@/lib/constants";
 
 interface AppUserAuthRecord {
   displayName?: string;
@@ -21,20 +22,8 @@ interface AppUserAuthRecord {
   updatedAt?: unknown;
 }
 
-const DEFAULT_ADMIN_USER_IDS = ["PH_admin", "GV_admin"];
-
-const ADMIN_USER_IDS = new Set(
-  [
-    ...DEFAULT_ADMIN_USER_IDS,
-    ...(process.env.NEXT_PUBLIC_ADMIN_USER_IDS || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
-  ]
-);
-
 function isAdminAccount(userId: string) {
-  return ADMIN_USER_IDS.has(userId);
+  return isAdminId(userId);
 }
 
 function normalizeRole(role: unknown, userId: string): AppUserRole {
@@ -50,7 +39,7 @@ function normalizeRole(role: unknown, userId: string): AppUserRole {
   return userId.startsWith("PH_") ? "parent" : "teacher";
 }
 
-function routeForAccount(role: AppUserRole, userId: string): "/parent" | "/teacher" | "/backend" {
+function routeForAccount(role: AppUserRole, _userId: string): "/parent" | "/teacher" | "/backend" {
   if (role === "admin" || role === "professor" || role === "projectmanager") return "/backend";
   if (role === "parent") return "/parent";
   return "/teacher";

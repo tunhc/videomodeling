@@ -10,6 +10,7 @@ import { doc, getDoc } from "firebase/firestore";
 import Link from "next/link";
 import { getLearnersForTeacher } from "@/lib/services/learnerService";
 import { getAuthSession, type AppUserRole } from "@/lib/auth-session";
+import { isAdminId } from "@/lib/constants";
 
 interface Student {
   id: string;
@@ -25,19 +26,8 @@ interface School {
   city: string;
 }
 
-const DEFAULT_ADMIN_USER_IDS = ["PH_admin", "GV_admin"];
-const ADMIN_USER_IDS = new Set(
-  [
-    ...DEFAULT_ADMIN_USER_IDS,
-    ...(process.env.NEXT_PUBLIC_ADMIN_USER_IDS || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
-  ]
-);
-
 function resolveTeacherPageRole(userId: string, role: string): AppUserRole {
-  if (role === "admin" || ADMIN_USER_IDS.has(userId)) return "admin";
+  if (role === "admin" || isAdminId(userId)) return "admin";
   if (role === "parent") return "parent";
   return "teacher";
 }
@@ -54,7 +44,7 @@ export default function TeacherHome() {
 
   useEffect(() => {
     const session = getAuthSession();
-    const userId = session?.userId || localStorage.getItem("userId") || "GV_DUONG_01";
+    const userId = session?.userId || localStorage.getItem("userId") || "";
     const roleFromSession = session?.userRole || localStorage.getItem("userRole") || "teacher";
     const resolvedRole = resolveTeacherPageRole(userId, roleFromSession);
 

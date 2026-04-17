@@ -31,19 +31,10 @@ import { db } from "@/lib/firebase";
 import { getLearnersForTeacher, type LearnerRecord } from "@/lib/services/learnerService";
 import { buildWordInsightsFromText } from "@/lib/word-insights";
 
-const DEFAULT_ADMIN_USER_IDS = ["PH_admin", "GV_admin"];
-const ADMIN_USER_IDS = new Set(
-  [
-    ...DEFAULT_ADMIN_USER_IDS,
-    ...(process.env.NEXT_PUBLIC_ADMIN_USER_IDS || "")
-      .split(",")
-      .map((id) => id.trim())
-      .filter(Boolean),
-  ]
-);
+import { isAdminId } from "@/lib/constants";
 
 function isAdminIdentity(userId: string, role: string) {
-  return role === "admin" || ADMIN_USER_IDS.has(userId);
+  return role === "admin" || isAdminId(userId);
 }
 
 type UploadResponse = {

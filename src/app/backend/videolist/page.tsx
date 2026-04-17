@@ -5,7 +5,7 @@ import {
   collection, getDocs, query, orderBy, doc, getDoc, 
   addDoc, serverTimestamp, setDoc, deleteDoc 
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, listAll, deleteObject, uploadBytesResumable } from "firebase/storage";
+import { ref, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { getAuthSession } from "@/lib/auth-session";
 import { 
@@ -66,6 +66,7 @@ export default function VideoListPage() {
   const [newNote, setNewNote] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadingPlan, setUploadingPlan] = useState(false);
+  const [previewPlanId, setPreviewPlanId] = useState<string | null>(null);
   const [previewFileUrl, setPreviewFileUrl] = useState<string | null>(null);
   const [videoPlayerUrl, setVideoPlayerUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,43 +199,44 @@ export default function VideoListPage() {
 
     setUploadingPlan(true);
     setUploadProgress(0);
-    
+
     try {
       const session = getAuthSession();
-      const storageRef = ref(storage, `intervention_plans/${selectedChildId}/${Date.now()}_${file.name}`);
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("childId", selectedChildId);
+      formData.append("uploaderId", session?.userId || "");
+      formData.append("uploaderName", session?.userName || "Chuyên gia");
 
-      uploadTask.on('state_changed', 
-        (snapshot: any) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        }, 
-        (error: Error) => {
-          console.error("Upload error:", error);
-          alert("Lỗi khi tải file lên: " + error.message);
-          setUploadingPlan(false);
-        }, 
-        async () => {
-          const downloadURL = await getDownloadURL(storageRef);
-          const planData = {
-            childId: selectedChildId,
-            name: file.name,
-            url: downloadURL,
-            uploadedAt: serverTimestamp(),
-            uploaderId: session?.userId || "unknown",
-            uploaderName: session?.userName || "Chuyên gia"
-          };
+      // Simulate progress while waiting for server response
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => (prev < 85 ? prev + 5 : prev));
+      }, 300);
 
-          const docRef = await addDoc(collection(db, "intervention_plans"), planData);
-          setPlans(prev => [{ id: docRef.id, ...planData, uploadedAt: new Date() } as any, ...prev]);
-          
-          if (fileInputRef.current) fileInputRef.current.value = "";
-          setUploadingPlan(false);
-          setUploadProgress(100);
-        }
-      );
-    } catch (err) {
-      console.error("Unexpected upload error:", err);
+      const res = await fetch("/api/upload-plan", { method: "POST", body: formData });
+
+      clearInterval(progressInterval);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Upload thất bại" }));
+        throw new Error(err.error || "Upload thất bại");
+      }
+
+      const { id, url, name } = await res.json();
+      const newPlan: InterventionPlan = {
+        id,
+        name,
+        url,
+        uploadedAt: new Date(),
+        uploaderName: session?.userName || "Chuyên gia",
+      };
+      setPlans(prev => [newPlan, ...prev]);
+      setUploadProgress(100);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      alert("Lỗi khi tải file lên: " + (err?.message || "Vui lòng thử lại"));
+    } finally {
       setUploadingPlan(false);
     }
   };
@@ -455,9 +457,12 @@ export default function VideoListPage() {
 
       {/* Child Detail Modal */}
     {isDetailOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center lg:p-4 p-0">
-          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={() => setIsDetailOpen(false)} />
-          <div className="relative bg-white w-full lg:max-w-5xl h-full lg:h-[85vh] lg:rounded-[3rem] rounded-none shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center lg:p-4 p-0">
+          <div 
+            className="absolute inset-0 bg-slate-900/80 backdrop-blur-md animate-in fade-in duration-300" 
+            onClick={() => setIsDetailOpen(false)} 
+          />
+          <div className="relative bg-white w-full lg:max-w-6xl h-full lg:h-[90vh] lg:rounded-[3rem] rounded-none shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-10 duration-500 scale-100 origin-center">
              
              {/* Modal Header */}
              <div className="p-8 border-b border-gray-50 bg-gray-50/30 flex items-center justify-between relative overflow-hidden">
@@ -484,9 +489,9 @@ export default function VideoListPage() {
              </div>
 
              {/* Modal Body */}
-             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden bg-white">
                 {/* Left Side: Intervention Plans */}
-                <div className="w-full lg:w-1/2 lg:p-8 p-6 overflow-y-auto custom-scrollbar lg:border-r border-b lg:border-b-0 border-gray-50 bg-gray-50/20">
+                <div className="w-full lg:w-[45%] lg:p-10 p-6 overflow-y-auto custom-scrollbar border-b lg:border-b-0 lg:border-r border-gray-100 bg-slate-50/30">
                    <div className="flex items-center justify-between mb-8">
                       <h3 className="text-lg font-black text-gray-800 flex items-center gap-2">
                          <FileCode className="w-5 h-5 text-indigo-500" />
@@ -536,8 +541,8 @@ export default function VideoListPage() {
                                      </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                     <button 
-                                       onClick={() => setPreviewFileUrl(plan.url)}
+                                     <button
+                                       onClick={() => { setPreviewPlanId(plan.id); setPreviewFileUrl(plan.url); }}
                                        className="p-3 bg-gray-50 text-gray-400 rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"
                                      >
                                         <Eye className="w-5 h-5" />
@@ -630,36 +635,34 @@ export default function VideoListPage() {
       )}
 
       {/* File Preview Popup */}
-      {previewFileUrl && (
+      {previewPlanId && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-8">
            <div className="absolute top-8 right-8 z-[210] flex gap-4">
-              <a 
-                href={previewFileUrl} 
-                target="_blank" 
-                rel="noreferrer"
-                className="bg-emerald-600 p-4 rounded-2xl text-white shadow-xl hover:scale-110 transition-all"
-                title="Tải về"
-              >
-                 <Download className="w-6 h-6" />
-              </a>
-              <button 
-                onClick={() => setPreviewFileUrl(null)}
+              {previewFileUrl && (
+                <a
+                  href={previewFileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="bg-emerald-600 p-4 rounded-2xl text-white shadow-xl hover:scale-110 transition-all"
+                  title="Tải file gốc"
+                >
+                  <Download className="w-6 h-6" />
+                </a>
+              )}
+              <button
+                onClick={() => { setPreviewPlanId(null); setPreviewFileUrl(null); }}
                 className="bg-white/10 p-4 rounded-2xl text-white backdrop-blur-md border border-white/20 hover:bg-white/20 transition-all hover:rotate-90"
               >
-                 <X className="w-6 h-6" />
+                <X className="w-6 h-6" />
               </button>
            </div>
-           
-           <div className="w-full max-w-6xl h-full bg-white rounded-[2rem] overflow-hidden shadow-2xl relative">
-              <iframe 
-                src={`https://docs.google.com/gview?url=${encodeURIComponent(previewFileUrl)}&embedded=true`}
+
+           <div className="w-full max-w-5xl h-full bg-white rounded-[2rem] overflow-hidden shadow-2xl">
+              <iframe
+                src={`/api/view-plan?id=${previewPlanId}`}
                 className="w-full h-full border-none"
+                title="Xem nội dung bài học"
               />
-              {/* Overlay Tip */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 bg-gray-900/80 backdrop-blur-lg rounded-2xl text-white flex items-center gap-3 shadow-2xl">
-                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                 <span className="text-sm font-bold tracking-tight">Trình xem trực tiếp Cloud. Chúc bạn một ngày làm việc hiệu quả!</span>
-              </div>
            </div>
         </div>
       )}

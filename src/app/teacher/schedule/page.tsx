@@ -39,7 +39,7 @@ export default function TeacherSchedule() {
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [selectedActivityForPlan, setSelectedActivityForPlan] = useState<Activity | null>(null);
 
-  const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") || "GV_DUONG_01" : "GV_DUONG_01";
+  const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") || "" : "";
   const userRole = typeof window !== 'undefined' ? localStorage.getItem("userRole") || "teacher" : "teacher";
 
   // 1. Load Children
