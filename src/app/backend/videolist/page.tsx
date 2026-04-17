@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
-import { collection, getDocs, query, orderBy, doc, getDoc, addDoc, serverTimestamp, setDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL, listAll } from "firebase/storage";
+import { 
+  collection, getDocs, query, orderBy, doc, getDoc, 
+  addDoc, serverTimestamp, setDoc, deleteDoc 
+} from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL, listAll, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { getAuthSession } from "@/lib/auth-session";
 import { 
   Search, Filter, Calendar, MapPin, User, FileText, Upload, 
   ChevronRight, Play, Eye, X, MessageSquare, Plus, FileSignature,
-  FileCode, CheckCircle2, Clock, MoreVertical, Download, Video
+  FileCode, CheckCircle2, Clock, MoreVertical, Download, Video,
+  Trash2
 } from "lucide-react";
 
 interface VideoItem {
@@ -241,6 +245,41 @@ export default function VideoListPage() {
     }
   };
 
+  const handleDeleteNote = async (id: string) => {
+    if (!confirm("Bạn có chắc muốn xóa ghi chú này?")) return;
+    try {
+      await deleteDoc(doc(db, "professor_notes", id));
+      setNotes(notes.filter(n => n.id !== id));
+    } catch (err) {
+      console.error("Error deleting note:", err);
+    }
+  };
+
+  const handleDeletePlan = async (id: string, url: string) => {
+    if (!confirm("Bạn có chắc muốn xóa bài học này? File sẽ bị xóa vĩnh viễn.")) return;
+    try {
+      // 1. Delete from Firestore
+      await deleteDoc(doc(db, "intervention_plans", id));
+      
+      // 2. Try to delete from Storage if it's a firebase URL
+      if (url.includes("firebasestorage.googleapis.com")) {
+        try {
+          // Extract path from URL or use a reference if we had it.
+          // For simplicity, we can try to get ref from URL
+          const fileRef = ref(storage, url);
+          await deleteObject(fileRef);
+        } catch (storageErr) {
+          console.warn("Storage deletion failed (might be expected if URL format is strange):", storageErr);
+        }
+      }
+      
+      setPlans(plans.filter(p => p.id !== id));
+    } catch (err) {
+      console.error("Error deleting plan:", err);
+      alert("Lỗi khi xóa bài học.");
+    }
+  };
+
   return (
     <div className="space-y-8 pb-20">
       {/* Header & Stats */}
@@ -400,10 +439,10 @@ export default function VideoListPage() {
       </div>
 
       {/* Child Detail Modal */}
-      {isDetailOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    {isDetailOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center lg:p-4 p-0">
           <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-md" onClick={() => setIsDetailOpen(false)} />
-          <div className="relative bg-white w-full max-w-5xl h-[85vh] rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="relative bg-white w-full lg:max-w-5xl h-full lg:h-[85vh] lg:rounded-[3rem] rounded-none shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
              
              {/* Modal Header */}
              <div className="p-8 border-b border-gray-50 bg-gray-50/30 flex items-center justify-between relative overflow-hidden">
@@ -430,9 +469,9 @@ export default function VideoListPage() {
              </div>
 
              {/* Modal Body */}
-             <div className="flex-1 flex overflow-hidden">
+             <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
                 {/* Left Side: Intervention Plans */}
-                <div className="w-1/2 p-8 overflow-y-auto custom-scrollbar border-r border-gray-50 bg-gray-50/20">
+                <div className="w-full lg:w-1/2 lg:p-8 p-6 overflow-y-auto custom-scrollbar lg:border-r border-b lg:border-b-0 border-gray-50 bg-gray-50/20">
                    <div className="flex items-center justify-between mb-8">
                       <h3 className="text-lg font-black text-gray-800 flex items-center gap-2">
                          <FileCode className="w-5 h-5 text-indigo-500" />
@@ -472,12 +511,20 @@ export default function VideoListPage() {
                                         <p className="text-[10px] font-black text-indigo-500 mt-1 uppercase">Người up: {plan.uploaderName}</p>
                                      </div>
                                   </div>
-                                  <button 
-                                    onClick={() => setPreviewFileUrl(plan.url)}
-                                    className="p-3 bg-gray-50 text-gray-400 rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"
-                                  >
-                                     <Eye className="w-5 h-5" />
-                                  </button>
+                                  <div className="flex items-center gap-2">
+                                     <button 
+                                       onClick={() => setPreviewFileUrl(plan.url)}
+                                       className="p-3 bg-gray-50 text-gray-400 rounded-2xl hover:bg-emerald-50 hover:text-emerald-600 transition-all"
+                                     >
+                                        <Eye className="w-5 h-5" />
+                                     </button>
+                                     <button 
+                                       onClick={() => handleDeletePlan(plan.id, plan.url)}
+                                       className="p-3 bg-gray-50 text-gray-300 rounded-2xl hover:bg-red-50 hover:text-red-500 transition-all"
+                                     >
+                                        <Trash2 className="w-5 h-5" />
+                                     </button>
+                                  </div>
                                </div>
                             </div>
                          ))}
@@ -491,7 +538,7 @@ export default function VideoListPage() {
                 </div>
 
                 {/* Right Side: Professor Notes */}
-                <div className="w-1/2 p-8 flex flex-col overflow-hidden">
+                <div className="w-full lg:w-1/2 lg:p-8 p-6 flex flex-col overflow-hidden">
                    <h3 className="text-lg font-black text-gray-800 flex items-center gap-2 mb-8">
                       <MessageSquare className="w-5 h-5 text-emerald-500" />
                       Ghi chú từ Chuyên gia
@@ -526,11 +573,19 @@ export default function VideoListPage() {
                             <div key={note.id} className="relative pl-6 border-l-2 border-gray-100">
                                <div className="absolute left-[-9px] top-0 w-4 h-4 rounded-full bg-white border-4 border-emerald-500" />
                                <div className="bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm">
-                                  <div className="flex items-center justify-between mb-3">
-                                     <span className="text-xs font-black text-emerald-600 uppercase">{note.authorName}</span>
-                                     <span className="text-[10px] font-bold text-gray-400">
-                                        {note.createdAt?.toDate ? note.createdAt.toDate().toLocaleString('vi-VN') : new Date(note.createdAt).toLocaleString('vi-VN')}
-                                     </span>
+                                  <div className="flex items-start justify-between mb-3">
+                                     <div>
+                                        <span className="text-xs font-black text-emerald-600 uppercase">{note.authorName}</span>
+                                        <span className="text-[10px] font-bold text-gray-400 block">
+                                           {note.createdAt?.toDate ? note.createdAt.toDate().toLocaleString('vi-VN') : new Date(note.createdAt).toLocaleString('vi-VN')}
+                                        </span>
+                                     </div>
+                                     <button 
+                                       onClick={() => handleDeleteNote(note.id)}
+                                       className="p-2 text-gray-200 hover:text-red-400 transition-colors"
+                                     >
+                                        <Trash2 className="w-4 h-4" />
+                                     </button>
                                   </div>
                                   <p className="text-sm text-gray-600 leading-relaxed font-medium">
                                      {note.content}
