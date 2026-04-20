@@ -9,11 +9,13 @@ import {
 } from "@/lib/claude";
 import { getAdminDb } from "@/lib/firebase-admin";
 import { cloudinaryService } from "@/lib/services/cloudinaryService";
+import { db as clientDb } from "@/lib/firebase";
+import { collection, query, where, getDocs } from "firebase/firestore";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// ── GET: fetch existing analysis for a video ───────────────────────────────
+// ── GET: fetch existing analysis for a video (uses client SDK — no Admin creds needed) ──
 export async function GET(request: NextRequest) {
   const videoId = request.nextUrl.searchParams.get("videoId");
   if (!videoId) {
@@ -21,19 +23,17 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const db = getAdminDb();
-    const snap = await db
-      .collection("video_analysis")
-      .where("videoId", "==", videoId)
-      .get();
+    const snap = await getDocs(
+      query(collection(clientDb, "video_analysis"), where("videoId", "==", videoId))
+    );
 
     if (snap.empty) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     const sorted = snap.docs.sort((a, b) => {
-      const ta = a.data().createdAt?.toMillis?.() ?? 0;
-      const tb = b.data().createdAt?.toMillis?.() ?? 0;
+      const ta = (a.data().createdAt?.toMillis?.() as number) ?? 0;
+      const tb = (b.data().createdAt?.toMillis?.() as number) ?? 0;
       return tb - ta;
     });
 
