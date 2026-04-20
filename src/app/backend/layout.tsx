@@ -20,7 +20,7 @@ export default function BackendLayout({ children }: { children: React.ReactNode 
   const navItems = [
     { name: "Tổng quan", href: "/backend", icon: <LayoutDashboard className="w-5 h-5" />, roles: ["admin", "professor", "projectmanager"] },
     { name: "Thống kê Video", href: "/backend/videos", icon: <Video className="w-5 h-5" />, roles: ["admin", "projectmanager", "professor"] },
-    { name: "Danh sách Video", href: "/backend/videolist", icon: <Activity className="w-5 h-5" />, roles: ["admin", "professor"] },
+    { name: "Danh sách Video", href: "/backend/videolist", icon: <Activity className="w-5 h-5" />, roles: ["admin", "professor", "projectmanager"] },
     { name: "Người dùng", href: "/backend/users", icon: <Users className="w-5 h-5" />, roles: ["admin"] },
     { name: "Cài đặt", href: "/backend/settings", icon: <Settings className="w-5 h-5" />, roles: ["admin"] },
   ];
