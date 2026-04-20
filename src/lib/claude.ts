@@ -569,6 +569,7 @@ export async function generateInterventionFromAnalysis(
   video: {
     duration?: number; context?: string; location?: string; topic?: string;
     category?: string; primaryTag?: string; parentNote?: string; expertNote?: string;
+    senderRole?: string; childState?: string; locationNote?: string;
   },
   child: { name?: string; nickname?: string; gender?: string },
   childId: string,
@@ -581,9 +582,9 @@ export async function generateInterventionFromAnalysis(
   const duration = video.duration ?? 60;
   const third = Math.floor(duration / 3);
 
-  const senderRole = (video as any).senderRole as string | undefined;
-  const childState = (video as any).childState as string | undefined;
-  const locationNote = (video as any).locationNote as string | undefined;
+  const senderRole = video.senderRole;
+  const childState = video.childState;
+  const locationNote = video.locationNote;
   const senderLabel = senderRole === "parent" ? "Phụ huynh" : "Giáo viên/Chuyên viên";
 
   const childLabel2 = `${child.name ?? childId}${child.nickname ? " (" + child.nickname + ")" : ""}`;
@@ -685,6 +686,7 @@ export async function generateReportContent(
   video: {
     duration?: number; context?: string; location?: string; topic?: string;
     category?: string; primaryTag?: string; parentNote?: string; expertNote?: string;
+    senderRole?: string; childState?: string; locationNote?: string;
   },
   child: { name?: string; nickname?: string; gender?: string },
   childId: string,
@@ -692,9 +694,9 @@ export async function generateReportContent(
   const childLabel = child.name ?? childId;
   const genderLabel = child.gender === "G" ? "Bé gái" : "Bé trai";
   const duration = video.duration ?? 60;
-  const senderRole = (video as any).senderRole as string | undefined;
-  const childState = (video as any).childState as string | undefined;
-  const locationNote = (video as any).locationNote as string | undefined;
+  const senderRole = video.senderRole;
+  const childState = video.childState;
+  const locationNote = video.locationNote;
   const senderLabel = senderRole === "parent" ? "Phụ huynh" : "Giáo viên/Chuyên viên";
 
   const prompt = `=== THÔNG TIN TRẺ ===
