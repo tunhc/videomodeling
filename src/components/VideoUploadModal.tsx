@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Upload, CheckCircle2, Loader2, Sparkles, ChevronRight, Video, Home, Building2, Trash2, XCircle } from "lucide-react";
+import { X, Upload, CheckCircle2, Loader2, Sparkles, ChevronRight, Video, Home, Building2, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { videoService } from "@/lib/services/videoService";
 import { cloudinaryService } from "@/lib/services/cloudinaryService";
@@ -39,20 +39,72 @@ export default function VideoUploadModal({
     : null;
   const [step, setStep] = useState<"upload" | "processing" | "labeling" | "context" | "success">("upload");
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
-  const [location, setLocation] = useState<string | null>(null);
   const [video, setVideo] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isChecking, setIsChecking] = useState(false);
   const [videoDuration, setVideoDuration] = useState<number>(0);
+  const [durationNotice, setDurationNotice] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const emotions = ["Vui vẻ", "Bình thường", "Căng thẳng", "Khóc/Quấy", "Kích động", "Sợ hãi"];
+
+  const readVideoDuration = async (inputFile: File): Promise<number | null> => {
+    return new Promise<number | null>((resolve) => {
+      const tempVideo = document.createElement("video");
+      const objectUrl = URL.createObjectURL(inputFile);
+      let settled = false;
+
+      const cleanup = () => {
+        tempVideo.onloadedmetadata = null;
+        tempVideo.onloadeddata = null;
+        tempVideo.ondurationchange = null;
+        tempVideo.onerror = null;
+        tempVideo.src = "";
+        URL.revokeObjectURL(objectUrl);
+      };
+
+      const finalize = (value: number | null) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+
+      const tryResolve = () => {
+        const duration = Number(tempVideo.duration);
+        if (Number.isFinite(duration) && duration > 0) {
+          finalize(duration);
+        }
+      };
+
+      const timeout = setTimeout(() => finalize(null), 15000);
+      const wrap = () => {
+        clearTimeout(timeout);
+        tryResolve();
+      };
+
+      tempVideo.preload = "metadata";
+      tempVideo.muted = true;
+      tempVideo.playsInline = true;
+      tempVideo.onloadedmetadata = wrap;
+      tempVideo.onloadeddata = wrap;
+      tempVideo.ondurationchange = wrap;
+      tempVideo.onerror = () => {
+        clearTimeout(timeout);
+        finalize(null);
+      };
+
+      tempVideo.src = objectUrl;
+      tempVideo.load();
+    });
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setUploadError("");
+      setDurationNotice("");
 
       if (maxUploadBytes !== null && file.size > maxUploadBytes) {
         const currentSizeMb = (file.size / (1024 * 1024)).toFixed(1);
@@ -68,33 +120,12 @@ export default function VideoUploadModal({
 
       setIsChecking(true);
       try {
-        const duration = await new Promise<number>((resolve) => {
-          const tempVideo = document.createElement("video");
-          tempVideo.preload = "metadata";
-          tempVideo.src = URL.createObjectURL(file);
-          
-          const timeout = setTimeout(() => {
-            resolve(0);
-            URL.revokeObjectURL(tempVideo.src);
-          }, 5000);
+        const duration = await readVideoDuration(file);
 
-          tempVideo.onloadedmetadata = () => {
-            clearTimeout(timeout);
-            resolve(tempVideo.duration);
-            URL.revokeObjectURL(tempVideo.src);
-          };
-
-          tempVideo.onerror = () => {
-            clearTimeout(timeout);
-            resolve(0);
-            URL.revokeObjectURL(tempVideo.src);
-          };
-        });
-
-        if (duration < 15 || duration > 300) {
+        if (typeof duration === "number" && (duration < 15 || duration > 300)) {
           const minutes = Math.floor(duration / 60);
           const seconds = Math.round(duration % 60);
-          const durationStr = duration > 0 ? `${minutes} phút ${seconds} giây` : "không xác định";
+          const durationStr = `${minutes} phút ${seconds} giây`;
           
           setUploadError(
             `Thời lượng video của bạn (${durationStr}) không nằm trong khoảng yêu cầu. ` +
@@ -105,10 +136,16 @@ export default function VideoUploadModal({
           return;
         }
 
-        setVideoDuration(duration);
+        if (duration === null) {
+          setDurationNotice(
+            "Hệ thống chưa đọc được thời lượng ngay trên thiết bị này. Bạn vẫn có thể tiếp tục tải lên, hệ thống sẽ tự kiểm tra ở bước sau."
+          );
+        }
+
+        setVideoDuration(typeof duration === "number" ? duration : 0);
         setVideo(file);
         setStep("labeling");
-      } catch (err) {
+      } catch {
         setUploadError("Có lỗi xảy ra khi kiểm tra video. Vui lòng thử lại.");
       } finally {
         setIsChecking(false);
@@ -126,7 +163,6 @@ export default function VideoUploadModal({
   };
 
   const handleLocationSelect = (loc: string | null) => {
-    setLocation(loc);
     handleFinish(loc);
   };
 
@@ -139,9 +175,6 @@ export default function VideoUploadModal({
     abortControllerRef.current = new AbortController();
     
     try {
-      // Use pre-extracted duration
-      const duration = videoDuration;
-
       // Resolve Child Metadata for Cloudinary Folder Organization
       let activeChildId = childId;
       let centerCode = "KBC";
@@ -186,7 +219,7 @@ export default function VideoUploadModal({
       const finalTopic = initialTopic || defaultName;
 
       // 2. Upload to Cloudinary with standardized naming
-      const locationMapping: any = {
+      const locationMapping: Record<string, string> = {
         "Tại nhà": "home",
         "Tại trường": "school",
         "Công cộng": "public",
@@ -210,6 +243,13 @@ export default function VideoUploadModal({
         abortControllerRef.current
       );
 
+      const finalDuration =
+        videoDuration > 0
+          ? videoDuration
+          : typeof cloudinaryResult.duration === "number"
+          ? cloudinaryResult.duration
+          : 0;
+
       // 3. Register Metadata in Firebase
       const newVideo = await videoService.registerVideoMetadata(
         cloudinaryResult.secureUrl, 
@@ -220,7 +260,7 @@ export default function VideoUploadModal({
           location: selectedLocation || "",
           context: selectedLocation === "Tại trường" ? "school" : "home",
           topic: finalTopic,
-          duration: Math.round(duration),
+          duration: Math.round(finalDuration),
           lesson: initialLesson || "",
           category: initialCategory || ""
         },
@@ -242,7 +282,7 @@ export default function VideoUploadModal({
           router.push(target);
         }
       }, 1500);
-    } catch (error: any) {
+    } catch (error: unknown) {
       const message = typeof error?.message === "string" ? error.message : "Không xác định";
       const messageLower = message.toLowerCase();
       if (message === "Upload canceled") {
@@ -284,9 +324,9 @@ export default function VideoUploadModal({
     setStep("upload");
     setVideo(null);
     setSelectedEmotions([]);
-    setLocation(null);
     setUploadError("");
     setUploadProgress(0);
+    setDurationNotice("");
     abortControllerRef.current = null;
   };
 
@@ -355,6 +395,12 @@ export default function VideoUploadModal({
               {uploadError ? (
                 <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 font-semibold leading-relaxed">
                   {uploadError}
+                </div>
+              ) : null}
+
+              {durationNotice ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 font-semibold leading-relaxed">
+                  {durationNotice}
                 </div>
               ) : null}
 

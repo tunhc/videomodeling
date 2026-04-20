@@ -1,6 +1,16 @@
 /**
  * Cloudinary Service for client-side video uploads
  */
+type CloudinaryUploadApiResponse = {
+  url?: string;
+  public_id?: string;
+  secure_url?: string;
+  duration?: number;
+  error?: {
+    message?: string;
+  };
+};
+
 export const cloudinaryService = {
   /**
    * Upload video to Cloudinary using Unsigned Presets
@@ -82,7 +92,7 @@ export const cloudinaryService = {
       uploadId?: string;
       label: string;
     }) => {
-      return new Promise<any>((resolve, reject) => {
+      return new Promise<CloudinaryUploadApiResponse>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         let settled = false;
 
@@ -92,7 +102,7 @@ export const cloudinaryService = {
           }
         };
 
-        const finalizeResolve = (value: any) => {
+        const finalizeResolve = (value: CloudinaryUploadApiResponse) => {
           if (settled) return;
           settled = true;
           cleanup();
@@ -216,15 +226,23 @@ export const cloudinaryService = {
         onProgress(100);
       }
 
+      const url = typeof response.url === "string" ? response.url : "";
+      const publicId = typeof response.public_id === "string" ? response.public_id : "";
+      const secureUrl = typeof response.secure_url === "string" ? response.secure_url : "";
+      if (!url || !publicId || !secureUrl) {
+        throw new Error("Cloudinary upload failed: thiếu dữ liệu URL trả về");
+      }
+
       return {
-        url: response.url,
-        publicId: response.public_id,
-        secureUrl: response.secure_url,
+        url,
+        publicId,
+        secureUrl,
+        duration: typeof response.duration === "number" ? response.duration : undefined,
       };
     }
     
     let start = 0;
-    let lastResponse: any = null;
+    let lastResponse: CloudinaryUploadApiResponse | null = null;
     let chunkIndex = 0;
 
     while (start < totalSize) {
@@ -268,10 +286,18 @@ export const cloudinaryService = {
       onProgress(100);
     }
 
+    const url = typeof lastResponse.url === "string" ? lastResponse.url : "";
+    const publicId = typeof lastResponse.public_id === "string" ? lastResponse.public_id : "";
+    const secureUrl = typeof lastResponse.secure_url === "string" ? lastResponse.secure_url : "";
+    if (!url || !publicId || !secureUrl) {
+      throw new Error("Upload failed: thiếu dữ liệu URL từ chunk cuối");
+    }
+
     return {
-      url: lastResponse.url,
-      publicId: lastResponse.public_id,
-      secureUrl: lastResponse.secure_url,
+      url,
+      publicId,
+      secureUrl,
+      duration: typeof lastResponse.duration === "number" ? lastResponse.duration : undefined,
     };
   },
 
