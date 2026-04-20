@@ -149,7 +149,7 @@ export default function TeacherLibrary() {
         setParentVideos(vList.slice(0, 2));
 
         // Fetch HPDT stats for accurate metrics
-        const statsRef = doc(db, "hpdt_stats", selectedStudentId);
+        const statsRef = doc(db, "hpdt_stats", selectedStudentId!);
         const statsSnap = await getDoc(statsRef);
         let currentHpdt = 75;
         let currentDimensions = { communication: 75, social: 75, behavior: 75 };

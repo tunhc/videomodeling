@@ -107,6 +107,15 @@ interface FrameHpdt {
   overall: number;
 }
 
+interface FrameVideoQuality {
+  lighting: string;
+  sharpness: string;
+  frontView: boolean;
+  sideView45: boolean;
+  overallPass: boolean;
+  warnings: string[];
+}
+
 interface AnalysisData {
   analysisId: string;
   frameAnalysis: {
@@ -114,6 +123,7 @@ interface AnalysisData {
     summary: string;
     suggestedNote: string;
     hpdt: FrameHpdt;
+    videoQuality?: FrameVideoQuality;
   };
   segments: Segment[];
   summary: {

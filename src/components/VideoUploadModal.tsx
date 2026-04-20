@@ -14,16 +14,18 @@ interface VideoUploadModalProps {
   initialTopic?: string;
   initialLesson?: string;
   initialCategory?: string;
+  onSuccess?: () => void;
 }
 
-export default function VideoUploadModal({ 
-  isOpen, 
-  onClose, 
-  role, 
-  childId, 
+export default function VideoUploadModal({
+  isOpen,
+  onClose,
+  role,
+  childId,
   initialTopic,
   initialLesson,
-  initialCategory 
+  initialCategory,
+  onSuccess
 }: VideoUploadModalProps) {
   const router = useRouter();
   const rawMaxUploadMb = (process.env.NEXT_PUBLIC_CLOUDINARY_MAX_FILE_SIZE_MB || "").trim();
@@ -226,6 +228,7 @@ export default function VideoUploadModal({
       );
       
       setStep("success");
+      onSuccess?.();
       
       setTimeout(() => {
         onClose();
