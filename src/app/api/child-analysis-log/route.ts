@@ -1,26 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 
 export const runtime = "nodejs";
 
-/**
- * GET /api/child-analysis-log?childId=xxx
- *
- * Returns all saved analyses for a child, each enriched with the original
- * video's createdAt date so the frontend can build a chronological timeline.
- *
- * Shape of each log entry:
- * {
- *   analysisId, videoId, childId,
- *   videoUploadedAt,   ← date of the source video (ISO string)
- *   confirmedAt,       ← date teacher pressed "Lưu" (ISO string)
- *   hpdt: { overall, social, cognitive, behavior, sensory, motor },
- *   regulationLevel, dominantBehavior,
- *   summary, keyInsights,
- *   interventionPlan: { approach, goals, collaborationMessage },
- *   lessonCount,
- * }
- */
 export async function GET(req: NextRequest) {
   const childId = req.nextUrl.searchParams.get("childId");
   if (!childId) {
@@ -28,25 +11,21 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const db = getAdminDb();
-
-    // Fetch all analyses for this child
-    const snap = await db
-      .collection("video_analysis")
-      .where("childId", "==", childId)
-      .get();
+    const snap = await getDocs(
+      query(collection(db, "video_analysis"), where("childId", "==", childId))
+    );
 
     if (snap.empty) {
       return NextResponse.json({ logs: [], hpdtTrend: [] });
     }
 
-    // Batch-fetch corresponding video docs so we can get videoUploadedAt
+    // Batch-fetch corresponding video docs
     const videoIds = [...new Set(snap.docs.map((d) => d.data().videoId).filter(Boolean))];
     const videoMap: Record<string, any> = {};
     await Promise.all(
       videoIds.map(async (vid) => {
-        const vSnap = await db.collection("video_modeling").doc(vid).get();
-        if (vSnap.exists) videoMap[vid] = vSnap.data();
+        const vSnap = await getDoc(doc(db, "video_modeling", vid));
+        if (vSnap.exists()) videoMap[vid] = vSnap.data();
       })
     );
 
@@ -54,7 +33,6 @@ export async function GET(req: NextRequest) {
       const a = d.data();
       const videoDoc = videoMap[a.videoId] ?? {};
 
-      // Determine the canonical sort date: video upload date > analysis creation date
       const videoUploadedAt =
         videoDoc.createdAt?.toDate?.()?.toISOString?.() ??
         (videoDoc.createdAt ? new Date(videoDoc.createdAt).toISOString() : null);
@@ -87,21 +65,18 @@ export async function GET(req: NextRequest) {
         goals: a.interventionPlan?.goals ?? [],
         collaborationMessage: a.interventionPlan?.collaborationMessage ?? "",
         lessonCount: (a.interventionPlan?.lessons ?? []).length,
-        // Include video metadata for display
         videoLocation: videoDoc.location ?? "",
         videoTopic: videoDoc.topic ?? "",
         videoStatus: videoDoc.status ?? "",
       };
     });
 
-    // Sort ascending — prefer videoUploadedAt, fall back to confirmedAt
     logs.sort((a, b) => {
       const da = new Date(a.videoUploadedAt ?? a.confirmedAt ?? 0).getTime();
       const db2 = new Date(b.videoUploadedAt ?? b.confirmedAt ?? 0).getTime();
       return da - db2;
     });
 
-    // Build HPDT trend series (used by parent chart)
     const hpdtTrend = logs
       .filter((l) => l.hpdt.overall > 0)
       .map((l) => ({

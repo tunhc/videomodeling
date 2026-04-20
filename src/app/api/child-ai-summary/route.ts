@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const runtime = "nodejs";
@@ -25,16 +26,16 @@ export async function GET(req: NextRequest) {
   if (!childId) return NextResponse.json({ error: "childId required" }, { status: 400 });
 
   try {
-    const db = getAdminDb();
-
-    const snap = await db.collection("video_analysis").where("childId", "==", childId).get();
+    const snap = await getDocs(
+      query(collection(db, "video_analysis"), where("childId", "==", childId))
+    );
     const count = snap.size;
     if (count === 0) return NextResponse.json({ summary: null });
 
     // Return cache if analysis count unchanged
-    const cacheRef = db.collection("child_ai_summary").doc(childId);
-    const cache = await cacheRef.get();
-    if (cache.exists && cache.data()?.analysisCount === count) {
+    const cacheRef = doc(db, "child_ai_summary", childId);
+    const cache = await getDoc(cacheRef);
+    if (cache.exists() && cache.data()?.analysisCount === count) {
       return NextResponse.json({ summary: cache.data()?.summary as AiSummary });
     }
 
@@ -52,8 +53,8 @@ export async function GET(req: NextRequest) {
       })
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    const childSnap = await db.collection("children").doc(childId).get();
-    const childName = childSnap.exists ? (childSnap.data()?.name ?? "bé") : "bé";
+    const childSnap = await getDoc(doc(db, "children", childId));
+    const childName = childSnap.exists() ? (childSnap.data()?.name ?? "bé") : "bé";
 
     const key = process.env.GOOGLE_GEMINI_API_KEY?.trim();
     if (!key) throw new Error("GOOGLE_GEMINI_API_KEY missing");
@@ -90,7 +91,7 @@ Output JSON thuần, không markdown:
     s = s.slice(start, end + 1).replace(/,\s*([}\]])/g, "$1");
     const summary: AiSummary = JSON.parse(s);
 
-    await cacheRef.set({ analysisCount: count, summary, updatedAt: new Date().toISOString() });
+    await setDoc(cacheRef, { analysisCount: count, summary, updatedAt: new Date().toISOString() });
 
     return NextResponse.json({ summary });
   } catch (err) {
