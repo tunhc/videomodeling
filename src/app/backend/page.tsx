@@ -50,7 +50,7 @@ export default function BackendDashboardPage() {
         setTotalAccounts(accounts);
         setExpertsCount(experts);
 
-        const reportsSnap = await getDocs(collection(db, "child_exercises"));
+        const reportsSnap = await getDocs(collection(db, "lessons"));
         setReportsCount(reportsSnap.size);
 
         // Leaderboard calculation

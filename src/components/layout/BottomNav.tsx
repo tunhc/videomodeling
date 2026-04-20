@@ -21,7 +21,7 @@ export default function BottomNav({ role }: { role: "parent" | "teacher" }) {
 
   const teacherLinks = [
     { href: "/teacher", icon: Users, label: "Lớp học" },
-    { href: "/teacher/hubvideo", icon: Library, label: "Thư viện" },
+    { href: "/teacher/library", icon: Library, label: "Thư viện" },
     { href: "/teacher/hub", icon: Brain, label: "AI Phân tích", isMain: true },
     { href: "/teacher/instruction", icon: MessageSquare, label: "Lời nhắn" },
     { href: "/teacher/schedule", icon: Calendar, label: "Lịch dạy" },

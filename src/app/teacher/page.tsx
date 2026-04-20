@@ -6,7 +6,7 @@ import { Search, QrCode, TrendingUp, Upload, MessageCircle, FileText } from "luc
 import VideoUploadModal from "@/components/VideoUploadModal";
 import UserMenu from "@/components/layout/UserMenu";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import Link from "next/link";
 import { getLearnersForTeacher } from "@/lib/services/learnerService";
 import { getAuthSession, type AppUserRole } from "@/lib/auth-session";
@@ -18,6 +18,7 @@ interface Student {
   initial: string;
   status: string;
   hpdt: number;
+  growth: number;
 }
 
 interface School {
@@ -73,13 +74,34 @@ export default function TeacherHome() {
         }
 
         const learners = await getLearnersForTeacher(userId, resolvedRole);
-        const list: Student[] = learners.map((learner) => ({
-          id: learner.id,
-          name: learner.name || "Học sinh không tên",
-          initial: learner.initial || (learner.name ? learner.name[0] : "?"),
-          status: learner.status || "Bình thường",
-          hpdt: typeof learner.hpdt === "number" ? learner.hpdt : 0,
-        }));
+        const learnerIds = learners.map(l => l.id);
+        const statsMap: Record<string, number> = {};
+
+        // Fetch most accurate HPDT from hpdt_stats collection
+        if (learnerIds.length > 0) {
+          for (let i = 0; i < learnerIds.length; i += 30) {
+            const chunk = learnerIds.slice(i, i + 30);
+            const q = query(collection(db, "hpdt_stats"), where("childId", "in", chunk));
+            const snap = await getDocs(q);
+            snap.forEach(d => {
+              const data = d.data();
+              statsMap[data.childId] = data.overallScore || data.overall || 75;
+            });
+          }
+        }
+
+        const list: Student[] = learners.map((learner) => {
+          const currentHpdt = statsMap[learner.id] || (typeof learner.hpdt === "number" ? learner.hpdt : 75);
+          return {
+            id: learner.id,
+            name: learner.name || "Học sinh không tên",
+            initial: learner.initial || (learner.name ? learner.name[0] : "?"),
+            status: learner.status || "Bình thường",
+            hpdt: currentHpdt,
+            // Growth is calculated as current progress above baseline (70)
+            growth: Math.max(0, currentHpdt - 70),
+          };
+        });
         setStudents(list);
       } catch (e) {
         console.error("Failed to load teacher data:", e);
@@ -98,8 +120,12 @@ export default function TeacherHome() {
   const averageHpdt = students.length > 0 
     ? students.reduce((acc, s) => acc + s.hpdt, 0) / students.length 
     : 0;
-  // Giả lập công thức đo lường hpDT Tăng trưởng = (Trung bình hpDT lớp / mốc baseline 30) * Tỉ lệ nỗ lực
-  const growthHpdt = averageHpdt > 0 ? ((averageHpdt / 30) * 8.5).toFixed(1) : "0.0";
+  
+  // Tính trung bình tăng trưởng của cả lớp = trung bình (hpDT của từng bé - 70)
+  const averageGrowth = students.length > 0
+    ? students.reduce((acc, s) => acc + s.growth, 0) / students.length
+    : 0;
+  const growthHpdt = averageGrowth.toFixed(1);
 
   const dotColors = ["bg-indigo-400", "bg-blue-400", "bg-emerald-400", "bg-violet-400"];
   const bgColors = ["bg-indigo-50 text-primary", "bg-blue-50 text-blue-600", "bg-emerald-50 text-emerald-600", "bg-violet-50 text-violet-600"];

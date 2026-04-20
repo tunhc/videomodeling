@@ -83,8 +83,8 @@ export default function LoginPage() {
         className="w-full max-w-md bg-white rounded-3xl shadow-soft p-8 border border-white/50 backdrop-blur-sm"
       >
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 text-primary mb-4">
-            <Building2 size={40} />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white mb-4 shadow-sm overflow-hidden border border-gray-100">
+            <img src="/icon.jpg" alt="NBAI Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800">AI4Autism</h1>
           <p className="text-gray-500 mt-2">Video Modeling System</p>

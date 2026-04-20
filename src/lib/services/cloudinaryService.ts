@@ -345,7 +345,6 @@ export const cloudinaryService = {
 
   /**
    * Extract the public_id from a Cloudinary URL to use as a display title
-   * Example: .../folder/parent_KBC-HCM_Long_B01_2026041310.mp4 -> parent_KBC-HCM_Long_B01_2026041310
    */
   extractPublicIdFromUrl(url: string) {
     if (!url) return "Video";
@@ -355,6 +354,37 @@ export const cloudinaryService = {
       return filenameWithExt.split(".")[0] || "Video";
     } catch {
       return "Video";
+    }
+  },
+
+  /**
+   * Generate a frame extraction URL from a video URL
+   */
+  getFrameUrl(videoUrl: string, second: number) {
+    if (!videoUrl || !videoUrl.includes("cloudinary.com")) return null;
+    try {
+      const urlObj = new URL(videoUrl);
+      const parts = urlObj.pathname.split("/");
+      const uploadIdx = parts.indexOf("upload");
+      if (uploadIdx === -1) return null;
+
+      const base = `${urlObj.origin}${parts.slice(0, uploadIdx + 1).join("/")}`;
+      
+      // Skip transformations: any part between /upload/ and the first part starting with 'v' followed by digits
+      let resourceIdx = uploadIdx + 1;
+      while (resourceIdx < parts.length) {
+        if (/^v\d+/.test(parts[resourceIdx])) break; // Found version
+        if (parts[resourceIdx].includes(".") && resourceIdx === parts.length - 1) break; // Found filename (no version case)
+        if (!parts[resourceIdx].includes("_") && !parts[resourceIdx].includes(",")) break; // Likely start of public_id folders
+        resourceIdx++;
+      }
+
+      const resourcePath = parts.slice(resourceIdx).join("/");
+      const jpgPath = resourcePath.replace(/\.[^./?#]+$/, ".jpg");
+      
+      return `${base}/so_${Math.floor(second)},c_fill,w_480,h_640/${jpgPath}`;
+    } catch {
+      return null;
     }
   }
 };

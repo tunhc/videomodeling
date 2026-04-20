@@ -12,6 +12,10 @@ const lexend = Lexend({
 export const metadata: Metadata = {
   title: "AI4Autism - Video Modeling",
   description: "Hyper-personalized Digital Twin (hpDT) for Autism Support",
+  icons: {
+    icon: "/icon.jpg",
+    apple: "/icon.jpg",
+  },
 };
 
 const LEGACY_BROWSER_GUARD = `

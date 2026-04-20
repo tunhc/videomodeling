@@ -115,6 +115,13 @@ export default function ParentVSTChat() {
       }
     } catch (error) {
       console.error("Chat error:", error);
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 2).toString(),
+        text: "Xin lỗi, tôi đang gặp gián đoạn kết nối. Anh/Chị vui lòng thử lại sau nhé.",
+        sender: "vst",
+        isAI: true,
+        timestamp: new Date(),
+      }]);
       setIsTyping(false);
     }
   };

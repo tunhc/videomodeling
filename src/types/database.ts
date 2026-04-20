@@ -13,7 +13,7 @@ export interface VideoMetadata {
   allTags: string[];
   context: "home" | "school" | "commute" | "public";
   topic: string; // Specific activity within tag
-  status: "pending" | "analyzed" | "flagged";
+  status: "pending" | "Đã phân tích" | "flagged";
   parentNote?: string;
   expertNote?: string;
   verifiedTags: string[];

@@ -1,689 +1,404 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Pause, Maximize2,
-  ShieldCheck, Loader2, Tag, ChevronRight,
-  MessageSquare, Video, Check, Info, Play, Sparkles,
-  Brain
+  Loader2, ChevronLeft, Brain, Video, MessageSquare,
+  ShieldCheck, CheckCircle2, AlertTriangle, Activity,
+  TrendingUp, BookOpen, Star, Check
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { collection, doc, setDoc, addDoc } from "firebase/firestore";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Suspense } from "react";
 import { videoService } from "@/lib/services/videoService";
 import { aiNoteAnalyser } from "@/lib/services/ai-note-analyser";
 import type { VideoAnalysisResult } from "@/lib/claude";
 
 export default function TeacherAnalyzePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#0B0E14] flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#58A6FF]" size={40} />
-      </div>
-    }>
+    <Suspense fallback={<div className="min-h-screen bg-[#F0F7FF] flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" size={40} /></div>}>
       <AnalyzeContent />
     </Suspense>
   );
 }
 
+const HPDT_DOMAINS = [
+  { key: "social" as const, label: "Xã hội", color: "bg-emerald-500" },
+  { key: "cognitive" as const, label: "Nhận thức", color: "bg-purple-500" },
+  { key: "behavior" as const, label: "Hành vi", color: "bg-amber-500" },
+  { key: "sensory" as const, label: "Giác quan", color: "bg-pink-500" },
+  { key: "motor" as const, label: "Vận động", color: "bg-sky-500" },
+];
+
 function AnalyzeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const videoId = searchParams.get("id");
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
-
-  // Analysis state
+  const [video, setVideo] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(true);
-  const [analyzePhase, setAnalyzePhase] = useState<"scanning" | "claude" | "done">("scanning");
   const [progress, setProgress] = useState(0);
-  const [claudeResult, setClaudeResult] = useState<VideoAnalysisResult | null>(null);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-
-  // Tags (populated from Claude or defaults)
-  const [tags, setTags] = useState([
-    { id: 1, label: "Giao tiếp", auto: true, confirmed: false },
-    { id: 2, label: "Tập trung", auto: true, confirmed: false },
-    { id: 3, label: "Tương tác", auto: true, confirmed: false },
-  ]);
-  const [suggestedTags, setSuggestedTags] = useState<any[]>([]);
+  const [phase, setPhase] = useState<"scanning" | "ai" | "done">("scanning");
+  const [result, setResult] = useState<VideoAnalysisResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState("");
-  const [isSavingNote, setIsSavingNote] = useState(false);
-
-  // AI overlay state
-  const [trackingPos, setTrackingPos] = useState({ x: 50, y: 35 });
-  const [aiState, setAiState] = useState({ eyeContact: 85, emotion: "Tích cực", blinkCount: 12 });
-  const [milestones, setMilestones] = useState<any[]>([]);
-  const [hpdtResults, setHpdtResults] = useState({
-    social: 0, cognitive: 0, behavior: 0, sensory: 0, motor: 0, overall: 0
-  });
-
-  // Video player
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [videoDuration, setVideoDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const analysisStarted = useRef(false);
 
-  const togglePlay = () => {
-    if (!videoRef.current) return;
-    isPlaying ? videoRef.current.pause() : videoRef.current.play();
-    setIsPlaying(!isPlaying);
-  };
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
 
-  const handleSeek = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    if (!videoRef.current || videoDuration === 0) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
-    const percent = Math.max(0, clientX - rect.left) / rect.width;
-    videoRef.current.currentTime = percent * videoDuration;
-    setCurrentTime(percent * videoDuration);
-  };
-
-  const formatTime = (s: number) => {
-    if (!s || isNaN(s)) return "0:00";
-    return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  };
-
-  // Animated AI overlay while playing
-  useEffect(() => {
-    if (!isAnalyzing && selectedVideo && isPlaying) {
-      const interval = setInterval(() => {
-        setAiState(prev => ({
-          eyeContact: Math.floor(Math.random() * 15) + (claudeResult?.hpdt.social ?? 80),
-          emotion: Math.random() > 0.8 ? "Bình thường" : "Tích cực",
-          blinkCount: prev.blinkCount + (Math.random() > 0.9 ? 1 : 0),
-        }));
-        setTrackingPos(prev => {
-          const targetX = 50 + Math.sin(Date.now() / 2000) * 20;
-          const targetY = 35 + Math.cos(Date.now() / 3000) * 10;
-          return {
-            x: prev.x + (targetX - prev.x) * 0.05,
-            y: prev.y + (targetY - prev.y) * 0.05,
-          };
-        });
-      }, 100);
-      return () => clearInterval(interval);
-    }
-  }, [isAnalyzing, selectedVideo, isPlaying, claudeResult]);
-
-  // Run Claude analysis when video is loaded
-  const runClaudeAnalysis = useCallback(async (video: any) => {
-    if (!video?.url) return;
-
-    setAnalyzePhase("claude");
+  const runAnalysis = useCallback(async (v: any, dur: number) => {
+    if (!v?.id) return;
+    setPhase("ai");
     setProgress(40);
-
     try {
+      const teacherId = typeof window !== "undefined" ? localStorage.getItem("userId") || "system" : "system";
       const res = await fetch("/api/analyze-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          videoUrl: video.url,
-          duration: video.duration ?? videoDuration,
-          childContext: {
-            childId: video.childId,
-            primaryTag: video.primaryTag,
-            context: video.context,
-            topic: video.topic,
-          },
+          videoId: videoId,
+          childId: v.childId,
+          teacherId,
+          senderRole: "teacher",
+          childState: v.childState || "bình thường",
+          locationNote: v.location || v.context || "tại trường"
         }),
-        signal: AbortSignal.timeout(65_000),
+        signal: AbortSignal.timeout(120_000),
       });
-
-      if (!res.ok) throw new Error(`API ${res.status}`);
-
-      const result: VideoAnalysisResult = await res.json();
-      setClaudeResult(result);
-
-      // Populate tags from Claude
-      setTags(
-        result.tags.map((label, i) => ({ id: i + 1, label, auto: true, confirmed: false }))
-      );
-
-      // Populate milestones & HPDT
-      setMilestones(result.milestones);
-      setHpdtResults(result.hpdt);
-
-      // Pre-fill note with Claude's suggestion
-      if (result.suggestedNote) setNote(result.suggestedNote);
-
-      setProgress(100);
-      setAnalyzePhase("done");
-      setIsAnalyzing(false);
-    } catch (err) {
-      console.error("[Claude analysis]", err);
-      setAnalyzeError("Claude API không khả dụng. Dùng kết quả ước tính.");
-      setProgress(100);
-      setAnalyzePhase("done");
-      setIsAnalyzing(false);
-
-      // Fallback: generate simulated milestones
-      const dur = video.duration || videoDuration || 60;
-      const ms = Array.from({ length: 6 }, (_, i) => {
-        const second = Math.round((dur / 7) * (i + 1));
-        return {
-          second,
-          label: i % 2 === 0 ? "Đang tập trung" : "Tương tác tốt",
-          eyeContact: 75 + Math.floor(Math.random() * 20),
-          domain: (["Social", "Cognitive", "Behavior"] as const)[i % 3],
-          score: 70 + Math.floor(Math.random() * 20),
-        };
-      });
-      setMilestones(ms);
-      const avg = ms.reduce((s, m) => s + m.score, 0) / ms.length;
-      setHpdtResults({
-        social: Math.round(avg),
-        cognitive: Math.round(avg - 5),
-        behavior: Math.round(avg + 5),
-        sensory: Math.round(avg - 10),
-        motor: Math.round(avg),
-        overall: Math.round(avg),
-      });
-    }
-  }, [videoDuration]);
-
-  // Load video from DB
-  useEffect(() => {
-    if (!videoId) return;
-    async function loadVideo() {
-      try {
-        const data = await videoService.getVideoById(videoId as string);
-        if (data) {
-          const video = { ...data, title: data.topic || "Video phân tích" };
-          setSelectedVideo(video);
-          setIsAnalyzing(true);
-          setProgress(5);
-
-          // Kick off progress animation to 35% while we wait for metadata
-          const fakeProgress = setInterval(() => {
-            setProgress(prev => {
-              if (prev >= 35) { clearInterval(fakeProgress); return 35; }
-              return prev + 3;
-            });
-          }, 150);
-        }
-      } catch (error) {
-        console.error("Lỗi load video:", error);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `API ${res.status}`);
       }
+      const data = await res.json();
+      setAnalysisId(data.analysisId);
+      setResult(data.frameAnalysis);
+
+      if (data.frameAnalysis.suggestedNote) setNote(data.frameAnalysis.suggestedNote);
+      setProgress(100);
+      setPhase("done");
+      setIsAnalyzing(false);
+    } catch (err: any) {
+      console.error("Analysis error:", err);
+      setError(err.message || "Phân tích AI gặp sự cố. Vui lòng thử lại.");
+      setProgress(100);
+      setPhase("done");
+      setIsAnalyzing(false);
     }
-    loadVideo();
   }, [videoId]);
 
-  // Fetch suggested tags from note loop
   useEffect(() => {
-    if (selectedVideo) {
-      aiNoteAnalyser.getSuggestedTags(selectedVideo.childId || "").then(setSuggestedTags);
-    }
-  }, [selectedVideo]);
-
-  // Start Claude analysis once we have video duration
-  const analysisStarted = useRef(false);
-  useEffect(() => {
-    if (selectedVideo && videoDuration > 0 && !analysisStarted.current) {
-      analysisStarted.current = true;
-      runClaudeAnalysis({ ...selectedVideo, duration: videoDuration });
-    }
-  }, [selectedVideo, videoDuration, runClaudeAnalysis]);
-
-  // If duration never fires (video load error), start analysis after 3s anyway
-  useEffect(() => {
-    if (!selectedVideo) return;
-    const timer = setTimeout(() => {
-      if (!analysisStarted.current) {
-        analysisStarted.current = true;
-        runClaudeAnalysis(selectedVideo);
+    if (!videoId) return;
+    async function load() {
+      const data = await videoService.getVideoById(videoId!);
+      if (data) {
+        setVideo({ ...data, title: data.topic || "Video phân tích" });
+        setIsAnalyzing(true);
+        setProgress(5);
+        const t = setInterval(() => setProgress(p => { if (p >= 35) { clearInterval(t); return 35; } return p + 3; }), 150);
+        return () => clearInterval(t);
       }
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [selectedVideo, runClaudeAnalysis]);
-
-  const handleSaveNote = async () => {
-    if (!note || !selectedVideo) return;
-    setIsSavingNote(true);
-    try {
-      await aiNoteAnalyser.analyzeNoteIteration(
-        note,
-        selectedVideo.childId || "",
-        selectedVideo.id?.toString() || "",
-        "teacher"
-      );
-      const suggestions = await aiNoteAnalyser.getSuggestedTags(selectedVideo.childId || "");
-      setSuggestedTags(suggestions);
-      setIsSavingNote(false);
-      setNote("");
-    } catch (error) {
-      console.error("Pattern analysis failed:", error);
-      setIsSavingNote(false);
     }
-  };
+    load();
+  }, [videoId]);
 
-  const toggleConfirm = (id: number) => {
-    setTags(prev => prev.map(t => t.id === id ? { ...t, confirmed: !t.confirmed } : t));
-  };
+  useEffect(() => {
+    if (video && !analysisStarted.current) {
+      analysisStarted.current = true;
+      runAnalysis(video, video.duration || 0);
+    }
+  }, [video, runAnalysis]);
 
-  const handleFinishAnalysis = async () => {
-    setIsSavingNote(true);
+  const handleSave = async () => {
+    if (!video || !analysisId || saving) return;
+    setSaving(true);
     try {
-      if (note) await handleSaveNote();
-
-      await addDoc(collection(db, "video_analysis"), {
-        videoId: selectedVideo.id,
-        childId: selectedVideo.childId,
-        teacherId: typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "",
-        milestones,
-        hpdtAverages: hpdtResults,
-        finalSuccessRate: hpdtResults.overall,
-        claudeSummary: claudeResult?.summary || "",
-        analyzedByAI: !!claudeResult,
-        createdAt: new Date(),
-        videoDuration: selectedVideo.duration || videoDuration || 0,
+      // 1. Update analysis with teacher's note
+      await setDoc(doc(db, "video_analysis", analysisId), { 
         diary_notes: note,
+        teacherConfirmedAt: new Date()
+      }, { merge: true });
+
+      if (note) {
+        await aiNoteAnalyser.analyzeNoteIteration(note, video.childId || "", video.id?.toString() || "", "teacher");
+      }
+
+      // 2. Call confirm API
+      const teacherId = typeof window !== "undefined" ? localStorage.getItem("userId") || "system" : "system";
+      const res = await fetch("/api/analyze-video/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          analysisId,
+          videoId: video.id,
+          childId: video.childId,
+          teacherId
+        }),
       });
 
-      await setDoc(doc(db, "video_modeling", selectedVideo.id), { status: "analyzed" }, { merge: true });
+      if (!res.ok) throw new Error("Confirmation failed");
 
-      if (selectedVideo.childId) {
-        await setDoc(doc(db, "children", selectedVideo.childId), {
-          hpdt: hpdtResults.overall,
-          social: hpdtResults.social,
-          cognitive: hpdtResults.cognitive,
-          behavior: hpdtResults.behavior,
-          sensory: hpdtResults.sensory,
-          motor: hpdtResults.motor,
-          lastAnalysisAt: new Date(),
-        }, { merge: true });
-
-        await setDoc(doc(db, "hpdt_stats", selectedVideo.childId), {
-          childId: selectedVideo.childId,
-          overallScore: hpdtResults.overall,
-          dimensions: {
-            communication: hpdtResults.social * 0.9,
-            social: hpdtResults.social,
-            behavior: hpdtResults.behavior,
-            sensory: hpdtResults.sensory,
-            sensor: hpdtResults.motor,
-          },
-          lastUpdate: new Date(),
-        }, { merge: true });
-      }
-
-      alert("Đã lưu kết quả phân tích AI và cập nhật Bản sao số (hpDT)!");
-      router.push("/teacher/hub");
+      setSaved(true);
+      setTimeout(() => router.push("/teacher"), 1200);
     } catch (e) {
-      console.error("Lưu thất bại:", e);
-    } finally {
-      setIsSavingNote(false);
+      console.error("Save failed:", e);
+      setSaving(false);
+      alert("Không thể lưu kết quả. Vui lòng thử lại.");
     }
   };
 
-  const analyzeStatusLabel = {
-    scanning: "Đang quét frame...",
-    claude: "Claude AI đang phân tích...",
-    done: "Phân tích hoàn tất",
-  }[analyzePhase];
-
-  if (!selectedVideo) {
+  if (!video) {
     return (
-      <div className="min-h-screen bg-[#0B0E14] flex items-center justify-center">
-        <Loader2 className="animate-spin text-[#58A6FF]" size={40} />
-        <p className="ml-4 text-white">Đang tải video...</p>
+      <div className="min-h-screen bg-[#F0F7FF] flex flex-col items-center justify-center gap-4">
+        <Loader2 className="animate-spin text-blue-500" size={40} />
+        <p className="text-gray-500 font-semibold">Đang phân tích video...</p>
       </div>
     );
   }
 
+  const vq = result?.videoQuality;
+  const hpdt = result?.hpdt;
+  const overall = hpdt?.overall ?? 0;
+
+  const LIGHTING_LABEL: Record<string, string> = { good: "Đủ sáng ✓", acceptable: "Hơi tối", poor: "Tối quá ✗" };
+  const SHARPNESS_LABEL: Record<string, string> = { sharp: "Nét rõ ✓", acceptable: "Hơi mờ", blurry: "Mờ quá ✗" };
+  const LIGHTING_COLOR: Record<string, string> = { good: "text-emerald-600 bg-emerald-50 border-emerald-200", acceptable: "text-amber-600 bg-amber-50 border-amber-200", poor: "text-red-600 bg-red-50 border-red-200" };
+  const SHARPNESS_COLOR: Record<string, string> = { sharp: "text-emerald-600 bg-emerald-50 border-emerald-200", acceptable: "text-amber-600 bg-amber-50 border-amber-200", blurry: "text-red-600 bg-red-50 border-red-200" };
+
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-[#C9D1D9] font-lexend flex flex-col p-8 pb-32">
+    <div className="min-h-screen bg-[#F0F7FF] pb-24 font-lexend">
       {/* Header */}
-      <header className="flex justify-between items-center mb-8 bg-[#161B22]/50 backdrop-blur-md p-6 rounded-[32px] border border-[#30363D]">
-        <div className="flex items-center gap-6">
-          <button
-            onClick={() => router.push("/teacher/hub")}
-            className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl border border-[#30363D] transition-all"
-          >
-            <ChevronRight className="rotate-180" size={24} />
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 sm:px-6 py-4 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.push("/teacher")} className="p-2 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition-all">
+            <ChevronLeft size={20} className="text-gray-600" />
           </button>
           <div>
-            <h1 className="text-2xl font-black tracking-tighter text-[#58A6FF] flex items-center gap-3">
-              <span className="bg-[#58A6FF]/20 p-2 rounded-xl text-[#58A6FF]">AI</span>
-              MODELING <span className="text-white">PRO</span>
+            <h1 className="text-base font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <span className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center"><Brain size={14} className="text-white" /></span>
+              Phân tích AI — Giáo viên
             </h1>
-            <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-widest opacity-50">
-              Phân tích: {selectedVideo.title}
-            </p>
+            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{video.title}</p>
           </div>
         </div>
-        {/* Claude badge */}
-        <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-purple-500/10 border border-purple-500/20 rounded-2xl">
-          <Brain size={14} className="text-purple-400" />
-          <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest">
-            Claude Opus 4.6
-          </span>
+        <div className="flex items-center gap-2">
+          {!isAnalyzing && (
+            <button
+              onClick={handleSave}
+              disabled={saving || saved}
+              className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-500/20"
+            >
+              {saved ? <><CheckCircle2 size={14} /> Đã lưu</> : saving ? <><Loader2 size={14} className="animate-spin" /> Đang xử lý...</> : <><Check size={14} /> Đồng ý và lưu</>}
+            </button>
+          )}
         </div>
       </header>
 
-      <div className="flex flex-col xl:flex-row gap-8 flex-1">
-        {/* Left: Video + Labels */}
-        <div className="flex-1 flex gap-8 flex-col lg:flex-row">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-          {/* Video Player */}
-          <div className="relative w-full max-w-[360px] mx-auto aspect-[9/16] bg-black rounded-[40px] overflow-hidden border border-[#30363D] shadow-2xl group shrink-0">
-            {/* Scanning/Claude overlay */}
-            <AnimatePresence>
-              {isAnalyzing && (
-                <motion.div
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-20 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center space-y-6 px-4"
-                >
-                  <div className="relative">
-                    <Loader2 size={60} className={`animate-spin ${analyzePhase === "claude" ? "text-purple-400" : "text-[#58A6FF]"}`} />
-                    <div className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-white">
-                      {progress}%
-                    </div>
-                  </div>
-                  <div className="text-center space-y-2">
-                    <h3 className="text-lg font-black tracking-widest text-white uppercase italic">
-                      {analyzePhase === "claude" ? "CLAUDE AI..." : "AI SCANNING..."}
-                    </h3>
-                    <p className="text-[8px] text-[#C9D1D9]/50 font-bold uppercase tracking-widest">
-                      {analyzeStatusLabel}
-                    </p>
-                    {analyzePhase === "claude" && (
-                      <div className="flex items-center gap-2 justify-center mt-2">
-                        <Brain size={12} className="text-purple-400 animate-pulse" />
-                        <span className="text-[8px] text-purple-400 font-bold uppercase tracking-widest">
-                          Phân tích frame bằng Vision AI
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Video */}
-            <div
-              className="absolute inset-0 flex items-center justify-center bg-[#0B0E14] cursor-crosshair"
-              onClick={(e) => {
-                if (!isAnalyzing && selectedVideo?.url) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const x = Math.max(15, Math.min(((e.clientX - rect.left) / rect.width) * 100, 85));
-                  const y = Math.max(15, Math.min(((e.clientY - rect.top) / rect.height) * 100, 85));
-                  setTrackingPos({ x, y });
-                }
-              }}
-            >
-              {selectedVideo?.url ? (
-                <video
-                  ref={videoRef}
-                  key={selectedVideo.id}
-                  src={selectedVideo.url}
-                  className="w-full h-full object-contain pointer-events-none brightness-110"
-                  autoPlay muted loop playsInline
-                  onLoadedMetadata={(e) => setVideoDuration(e.currentTarget.duration)}
-                  onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
-                />
-              ) : (
-                <Video size={80} className="text-white/5" />
-              )}
-            </div>
-
-            {/* AI Facial Tracking Overlay */}
-            {!isAnalyzing && selectedVideo?.url && (
-              <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
-                <motion.div
-                  initial={false}
-                  style={{
-                    left: `${trackingPos.x}%`,
-                    top: `${trackingPos.y}%`,
-                    width: 130, height: 130,
-                    x: "-50%", y: "-50%",
-                  }}
-                  animate={{ rotate: [0, 1, -1, 0.5, 0], scale: [1, 1.02, 0.98, 1.01, 1] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                  className="absolute border-2 border-[#58A6FF]/90 bg-[#58A6FF]/10 rounded-2xl flex flex-col justify-end p-2 shadow-[0_0_30px_rgba(88,166,255,0.3)] backdrop-blur-[1px] z-10 overflow-hidden"
-                >
-                  <svg className="absolute inset-0 w-full h-full opacity-60">
-                    <motion.g
-                      animate={{ x: [0, 2, -1, 0], y: [0, -2, 1, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      {[...Array(40)].map((_, i) => (
-                        <circle key={i} cx={`${20 + (i % 8) * 8.5}%`} cy={`${20 + Math.floor(i / 8) * 12}%`} r="1" fill="#58A6FF" className="opacity-50" />
-                      ))}
-                      <path d="M 20,40 L 80,40 M 20,60 L 80,60 M 20,80 L 80,80 M 40,20 L 40,100 M 60,20 L 60,100" stroke="#58A6FF" strokeWidth="0.2" fill="none" className="opacity-20" />
-                      <circle cx="35%" cy="35%" r="2" fill="#58A6FF" />
-                      <circle cx="65%" cy="35%" r="2" fill="#58A6FF" />
-                      <circle cx="50%" cy="50%" r="2" fill="#58A6FF" />
-                      <circle cx="40%" cy="70%" r="2" fill="#58A6FF" />
-                      <circle cx="60%" cy="70%" r="2" fill="#58A6FF" />
-                    </motion.g>
-                    <motion.rect
-                      initial={{ y: -130 }} animate={{ y: 260 }}
-                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      width="100%" height="4" fill="url(#scanline)"
-                    />
-                    <defs>
-                      <linearGradient id="scanline" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#58A6FF" stopOpacity="0" />
-                        <stop offset="50%" stopColor="#58A6FF" stopOpacity="0.8" />
-                        <stop offset="100%" stopColor="#58A6FF" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                  </svg>
-                  <div className="absolute -top-5 left-0 text-[7px] font-black tracking-widest text-[#58A6FF] bg-[#58A6FF]/10 px-1.5 py-0.5 rounded backdrop-blur border border-[#58A6FF]/30 w-max uppercase inline-flex items-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Đã khoá
-                  </div>
-                  <div className="text-[7px] font-mono text-emerald-400 bg-[#0B0E14]/80 px-1 py-0.5 rounded backdrop-blur self-start leading-none opacity-80 z-20">
-                    Mắt: {aiState.eyeContact}%
-                  </div>
-                  <div className="text-[7px] font-mono text-[#58A6FF] bg-[#0B0E14]/80 px-1 py-0.5 rounded backdrop-blur self-start leading-none opacity-80 mt-1 z-20">
-                    Blinks: {aiState.blinkCount}
-                  </div>
-                </motion.div>
-
-                {/* HUD */}
-                <div className="absolute top-4 inset-x-4 bg-[#0B0E14]/70 backdrop-blur-md border border-[#30363D] rounded-xl p-3 flex justify-between items-center z-20">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <span className="text-[8px] font-black uppercase text-gray-400 tracking-widest">AI VISION</span>
-                  </div>
-                  <div className="flex gap-4">
-                    <span className="text-[9px] font-black text-[#58A6FF] uppercase">{aiState.emotion}</span>
-                    <span className="text-[9px] font-black text-emerald-400 uppercase">Giao tiếp: {aiState.eyeContact}%</span>
-                  </div>
+        {/* Video */}
+        <div className="relative rounded-[28px] overflow-hidden bg-black shadow-2xl shadow-black/20 aspect-[16/9] max-h-64">
+          {video?.url && (
+            <video ref={videoRef} src={video.url} className="w-full h-full object-contain" autoPlay muted loop playsInline
+              onLoadedMetadata={e => setDuration(e.currentTarget.duration)} />
+          )}
+          <AnimatePresence>
+            {isAnalyzing && (
+              <motion.div exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+                <div className="relative">
+                  <Loader2 size={48} className={`animate-spin ${phase === "ai" ? "text-purple-400" : "text-blue-400"}`} />
+                  <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-white">{progress}%</div>
                 </div>
-              </div>
-            )}
-
-            {/* Video controls */}
-            <div className="absolute bottom-4 left-4 right-4 bg-[#161B22]/90 backdrop-blur-xl px-4 py-3 rounded-2xl border border-[#30363D] flex justify-between items-center z-20 shadow-2xl">
-              <button onClick={togglePlay} className="text-white hover:text-[#58A6FF]">
-                {isPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-              </button>
-              <div onClick={handleSeek} className="flex-1 mx-3 h-1 bg-white/10 rounded-full overflow-hidden cursor-pointer">
-                <div style={{ width: `${videoDuration ? (currentTime / videoDuration) * 100 : 0}%` }} className="h-full bg-[#58A6FF] shadow-[0_0_10px_#58A6FF]" />
-              </div>
-              <div className="text-[8px] font-mono text-gray-500 mr-2">{formatTime(currentTime)}</div>
-              <Maximize2 size={14} className="text-gray-500 hover:text-white" />
-            </div>
-          </div>
-
-          {/* Right panel: Tags + Note + Claude Summary */}
-          <div className="flex-1 flex flex-col gap-8">
-
-            {/* Claude Summary (shown after analysis) */}
-            {claudeResult?.summary && (
-              <motion.section
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-purple-500/5 p-6 rounded-[28px] border border-purple-500/20 space-y-3"
-              >
-                <div className="flex items-center gap-3">
-                  <Brain size={16} className="text-purple-400" />
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-purple-400">
-                    Claude AI — Tóm tắt buổi can thiệp
-                  </h4>
+                <div className="text-center">
+                  <p className="text-white font-black text-sm">{phase === "ai" ? "AI đang phân tích hành vi..." : "Đang quét video..."}</p>
+                  <p className="text-white/50 text-[10px] mt-1">Vui lòng chờ trong giây lát</p>
                 </div>
-                <p className="text-[11px] text-gray-300 leading-relaxed">{claudeResult.summary}</p>
-              </motion.section>
-            )}
-
-            {/* Error banner */}
-            {analyzeError && (
-              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-2xl p-4 text-[10px] text-yellow-400 font-bold uppercase tracking-widest">
-                ⚠ {analyzeError}
-              </div>
-            )}
-
-            {/* AI Tags */}
-            <section className="bg-[#161B22]/50 p-8 rounded-[40px] border border-[#30363D] space-y-6">
-              <div className="flex items-center gap-3">
-                <Tag size={20} className="text-[#58A6FF]" />
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
-                  Nhãn {claudeResult ? "Claude AI" : "AI"} (Verify Required)
-                </h4>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                {tags.map(tag => (
-                  <button
-                    key={tag.id}
-                    onClick={() => toggleConfirm(tag.id)}
-                    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all flex items-center gap-2 ${
-                      tag.confirmed
-                        ? "bg-[#58A6FF] border-[#58A6FF] text-white shadow-lg"
-                        : "bg-white/5 border-[#30363D] text-gray-400 hover:border-[#58A6FF]/50"
-                    }`}
-                  >
-                    {tag.label} {tag.confirmed && <Check size={14} />}
-                  </button>
-                ))}
-              </div>
-
-              {suggestedTags.length > 0 && (
-                <div className="pt-6 border-t border-[#30363D] space-y-4">
-                  <div className="flex items-center gap-3">
-                    <Sparkles size={16} className="text-purple-400" />
-                    <h4 className="text-[8px] font-black uppercase tracking-widest text-purple-400">
-                      Gợi ý từ Ghi chú (Pattern Loop)
-                    </h4>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {suggestedTags.map((st, i) => (
-                      <div key={i} className="px-4 py-2 bg-purple-500/10 border border-purple-500/20 text-purple-400 rounded-xl text-[8px] font-black uppercase tracking-widest">
-                        {st.keyword} ({st.frequency}x)
-                      </div>
-                    ))}
-                  </div>
+                <div className="w-48 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <motion.div className={`h-full rounded-full ${phase === "ai" ? "bg-purple-400" : "bg-blue-400"}`} animate={{ width: `${progress}%` }} transition={{ duration: 0.3 }} />
                 </div>
-              )}
-
-              <p className="text-[10px] text-[#58A6FF]/50 italic">
-                * {claudeResult ? "Claude Opus 4.6 phân tích trực tiếp từ frame video." : "AI tự động phân tích dựa trên bối cảnh video."}
-              </p>
-            </section>
-
-            {/* Note */}
-            <section className="bg-[#161B22]/50 p-10 rounded-[40px] border border-[#30363D] space-y-6">
-              <div className="flex items-center gap-3">
-                <MessageSquare size={20} className="text-emerald-500" />
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">
-                  Ghi chú Can thiệp
-                </h4>
-              </div>
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Nhập ghi chú cho giáo viên/phụ huynh tại đây..."
-                className="w-full bg-[#0B0E14] border border-[#30363D] rounded-3xl p-6 text-sm text-white placeholder-gray-700 outline-none focus:border-emerald-500 transition-all h-32 resize-none"
-              />
-            </section>
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Right Sidebar: Stats */}
-        <aside className="w-full lg:w-[380px] space-y-8">
-          <div className="bg-[#161B22] border border-[#30363D] rounded-[40px] p-10 space-y-10 shadow-hpdt">
+        {error && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+            <AlertTriangle size={16} className="text-amber-500 mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-amber-800 font-semibold">{error}</p>
+          </div>
+        )}
 
-            <div className="space-y-4">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-[#58A6FF]">
-                Điểm HPDT Tổng thể
-              </h3>
-              <div className="text-5xl font-black text-white italic">
-                {hpdtResults.overall}<span className="text-[#58A6FF] font-normal">%</span>
+        {!isAnalyzing && result && (
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
+
+            {/* Video Quality */}
+            {vq && (
+              <section className="bg-white rounded-[24px] border border-gray-100 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-black text-gray-800 flex items-center gap-2 text-sm">
+                    <Video size={16} className="text-blue-500" /> Chất lượng Video
+                  </h2>
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black border ${vq.overallPass ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"}`}>
+                    {vq.overallPass ? "✓ Đạt chuẩn" : "⚠ Cần cải thiện"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className={`rounded-2xl px-3 py-2.5 border text-center ${LIGHTING_COLOR[vq.lighting] ?? "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-0.5">Ánh sáng</p>
+                    <p className="text-xs font-black">{LIGHTING_LABEL[vq.lighting] ?? vq.lighting}</p>
+                  </div>
+                  <div className={`rounded-2xl px-3 py-2.5 border text-center ${SHARPNESS_COLOR[vq.sharpness] ?? "bg-gray-50 border-gray-200 text-gray-500"}`}>
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-0.5">Độ nét</p>
+                    <p className="text-xs font-black">{SHARPNESS_LABEL[vq.sharpness] ?? vq.sharpness}</p>
+                  </div>
+                  <div className={`rounded-2xl px-3 py-2.5 border text-center ${vq.frontView ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-0.5">Chính diện</p>
+                    <p className="text-xs font-black">{vq.frontView ? "✓ Có" : "✗ Không"}</p>
+                  </div>
+                  <div className={`rounded-2xl px-3 py-2.5 border text-center ${vq.sideView45 ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-gray-50 text-gray-400 border-gray-200"}`}>
+                    <p className="text-[9px] font-black uppercase tracking-widest opacity-60 mb-0.5">Góc 45°</p>
+                    <p className="text-xs font-black">{vq.sideView45 ? "✓ Có" : "✗ Không"}</p>
+                  </div>
+                </div>
+                {vq.warnings?.length > 0 && (
+                  <ul className="mt-3 space-y-1">
+                    {vq.warnings.map((w: string, i: number) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-amber-700 font-semibold">
+                        <span className="mt-0.5 flex-shrink-0">⚠</span> {w}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+
+            {/* HPDT Score */}
+            <section className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[24px] p-5 text-white shadow-xl shadow-blue-500/25">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-black text-sm flex items-center gap-2 opacity-90"><Star size={16} /> Điểm HPDT từ Video</h2>
+                <div className="text-right">
+                  <span className="text-4xl font-black">{overall}</span>
+                  <span className="text-lg opacity-60">/100</span>
+                </div>
               </div>
+              <div className="h-2 bg-white/20 rounded-full overflow-hidden mb-5">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${overall}%` }} transition={{ duration: 1, delay: 0.2 }} className="h-full bg-white rounded-full" />
+              </div>
+              <div className="space-y-2.5">
+                {HPDT_DOMAINS.map(d => (
+                  <div key={d.key} className="flex items-center gap-3">
+                    <span className="text-[10px] font-black uppercase tracking-wider opacity-70 w-16 flex-shrink-0">{d.label}</span>
+                    <div className="flex-1 h-1.5 bg-white/20 rounded-full overflow-hidden">
+                      <motion.div initial={{ width: 0 }} animate={{ width: `${hpdt?.[d.key] ?? 0}%` }} transition={{ duration: 0.8, delay: 0.1 }} className="h-full bg-white/80 rounded-full" />
+                    </div>
+                    <span className="text-[11px] font-mono font-black opacity-80 w-8 text-right">{hpdt?.[d.key] ?? 0}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-              {/* HPDT breakdown */}
-              {hpdtResults.overall > 0 && (
-                <div className="space-y-2 pt-2">
-                  {(["social", "cognitive", "behavior", "sensory", "motor"] as const).map((domain) => {
-                    const labels: Record<string, string> = {
-                      social: "Xã hội", cognitive: "Nhận thức",
-                      behavior: "Hành vi", sensory: "Giác quan", motor: "Vận động"
+            {/* Behavior Segments */}
+            {result.milestones && result.milestones.length > 0 && (
+              <section className="bg-white rounded-[24px] border border-gray-100 shadow-sm p-5">
+                <h2 className="font-black text-gray-800 flex items-center gap-2 text-sm mb-4">
+                  <Activity size={16} className="text-purple-500" /> Chặng hành vi
+                </h2>
+                <div className="space-y-2">
+                  {result.milestones.map((m: any, i: number) => {
+                    const score = m.eyeContact ?? m.score ?? 0;
+                    const color = score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-amber-400" : "bg-red-400";
+                    const domainConfig: Record<string, string> = {
+                      Social: "bg-emerald-50 text-emerald-700 border-emerald-200", Cognitive: "bg-purple-50 text-purple-700 border-purple-200",
+                      Behavior: "bg-amber-50 text-amber-700 border-amber-200", Sensory: "bg-pink-50 text-pink-700 border-pink-200", Motor: "bg-sky-50 text-sky-700 border-sky-200",
                     };
-                    const val = hpdtResults[domain];
                     return (
-                      <div key={domain} className="flex items-center gap-3">
-                        <span className="text-[9px] text-gray-500 font-bold w-20 uppercase tracking-wider">{labels[domain]}</span>
-                        <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                          <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${val}%` }}
-                            transition={{ duration: 0.8, delay: 0.1 }}
-                            className="h-full bg-[#58A6FF] rounded-full"
-                          />
+                      <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl">
+                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black text-white flex-shrink-0 ${color}`}>{score}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-black text-gray-800 truncate">{m.label}</p>
+                          <p className="text-[10px] text-gray-400 font-bold">{m.second}s</p>
                         </div>
-                        <span className="text-[9px] font-mono text-[#58A6FF] w-8 text-right">{val}%</span>
+                        <span className={`text-[9px] font-black px-2 py-1 rounded-xl border flex-shrink-0 ${domainConfig[m.domain] ?? "bg-gray-50 text-gray-500 border-gray-200"}`}>{m.domain}</span>
                       </div>
                     );
                   })}
                 </div>
-              )}
+              </section>
+            )}
 
-              {/* Milestones */}
-              {!isAnalyzing && milestones.length > 0 && (
-                <div className="pt-4 space-y-3">
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-b border-[#30363D] pb-2">
-                    Milestones ({milestones.length})
-                  </p>
-                  {milestones.map((m, i) => (
-                    <div key={i} className="flex justify-between items-center text-[10px] font-mono">
-                      <span className="text-gray-500">{m.second}s: {m.label}</span>
-                      <span className="text-emerald-400">{m.eyeContact ?? m.score}%</span>
-                    </div>
+            {/* AI Summary */}
+            {result.summary && (
+              <section className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-[24px] border border-blue-100 p-5">
+                <h2 className="font-black text-blue-700 flex items-center gap-2 text-sm mb-3"><Brain size={16} /> Nhận xét từ AI</h2>
+                <p className="text-sm text-blue-900 leading-relaxed">{result.summary}</p>
+              </section>
+            )}
+
+            {/* Overall Recommendation */}
+            {result.suggestedNote && (
+              <section className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-[24px] border border-emerald-100 p-5">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <h2 className="font-black text-emerald-700 flex items-center gap-2 text-sm">
+                    <TrendingUp size={16} /> Khuyến nghị tổng thể
+                  </h2>
+                  <button onClick={() => router.push("/teacher/library")}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-all flex-shrink-0">
+                    <BookOpen size={11} /> Thư viện bài tập
+                  </button>
+                </div>
+                <p className="text-sm text-emerald-900 leading-relaxed">{result.suggestedNote}</p>
+                <div className="mt-4 p-3 bg-white/60 rounded-2xl border border-emerald-100">
+                  <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest mb-1.5">📚 Xem báo cáo PDF đầy đủ</p>
+                  <p className="text-xs text-gray-600">Sau khi lưu, bạn có thể xem báo cáo PDF chi tiết tại <strong>Video Modeling</strong> của bé trong trang quản lý.</p>
+                </div>
+              </section>
+            )}
+
+            {/* Tags */}
+            {result.tags && result.tags.length > 0 && (
+              <section className="bg-white rounded-[24px] border border-gray-100 shadow-sm p-5">
+                <h2 className="font-black text-gray-700 text-sm mb-3">🏷️ Nhãn hành vi</h2>
+                <div className="flex flex-wrap gap-2">
+                  {result.tags.map((tag: string, i: number) => (
+                    <span key={i} className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-full text-xs font-black">{tag}</span>
                   ))}
                 </div>
-              )}
-            </div>
+              </section>
+            )}
 
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 text-emerald-500">
-                <ShieldCheck size={20} />
-                <span className="text-[10px] font-black uppercase tracking-widest">Dữ liệu đã mã hóa</span>
-              </div>
-              <button
-                onClick={handleFinishAnalysis}
-                disabled={isSavingNote}
-                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-6 rounded-3xl font-black text-sm shadow-2xl shadow-emerald-500/20 active:scale-95 transition-all flex items-center justify-center gap-3 uppercase tracking-tight disabled:opacity-50"
-              >
-                {isSavingNote ? <Loader2 className="animate-spin" size={20} /> : <ShieldCheck size={20} />}
-                LƯU HỒ SƠ & GHI CHÚ
+            {/* Intervention Note */}
+            <section className="bg-white rounded-[24px] border border-gray-100 shadow-sm p-5">
+              <h2 className="font-black text-gray-800 flex items-center gap-2 text-sm mb-3">
+                <MessageSquare size={16} className="text-emerald-500" /> Ghi chú can thiệp
+              </h2>
+              <textarea value={note} onChange={e => setNote(e.target.value)}
+                placeholder="Nhập ghi chú quan sát lâm sàng, hướng can thiệp, hoặc lời nhắn cho phụ huynh..."
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm text-gray-800 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all resize-none h-28" />
+            </section>
+
+            {/* Bottom buttons */}
+            <div className="flex gap-3">
+              <button onClick={handleSave} disabled={saving || saved}
+                className="flex-1 flex items-center justify-center gap-2 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-xl shadow-blue-500/25">
+                {saved ? <><CheckCircle2 size={18} /> Đã lưu!</> : saving ? <><Loader2 size={18} className="animate-spin" /> Đang xử lý...</> : <><Check size={18} /> Đồng ý và lưu kết quả</>}
               </button>
             </div>
+          </motion.div>
+        )}
+      </main>
 
-            <div className="pt-8 border-t border-[#30363D] space-y-4">
-              <div className="flex items-start gap-4 p-4 bg-white/5 rounded-2xl">
-                <Info size={16} className="text-gray-500 mt-1" />
-                <p className="text-[10px] leading-relaxed text-gray-500 font-bold italic uppercase tracking-widest">
-                  Sau khi lưu, video modeling của cô giáo sẽ được đẩy về lộ trình của trẻ tại dashboard Phụ huynh.
-                </p>
-              </div>
-            </div>
+      {saved && (
+        <motion.div initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }}
+          className="fixed bottom-8 left-4 right-4 max-w-sm mx-auto bg-blue-600 text-white rounded-[20px] p-4 flex items-center gap-3 shadow-2xl z-50">
+          <CheckCircle2 size={20} />
+          <div>
+            <p className="font-black text-sm">Lưu thành công!</p>
+            <p className="text-[11px] opacity-80">Đang quay về trang chủ...</p>
           </div>
-        </aside>
-      </div>
+        </motion.div>
+      )}
     </div>
   );
 }

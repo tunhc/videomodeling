@@ -2,12 +2,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import fs from "fs/promises";
 import path from "path";
 
-const apiKey = process.env.GOOGLE_GEMINI_API_KEY || "";
-const genAI = new GoogleGenerativeAI(apiKey);
-
 export const getGeminiResponse = async (prompt: string, context?: any, skillName: string = "pediatric-intervention-coach") => {
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const apiKey = process.env.GOOGLE_GEMINI_API_KEY?.trim();
+    if (!apiKey) throw new Error("GOOGLE_GEMINI_API_KEY is missing");
+    const model = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: "gemini-2.5-flash" });
 
     // Load Skill context
     let skillContext = "";

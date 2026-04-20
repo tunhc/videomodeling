@@ -57,10 +57,7 @@ async function findChildForParent(parentId: string) {
   const expectedChildId = parentId.startsWith("PH_") ? parentId.replace("PH_", "") : "";
 
   if (expectedChildId) {
-    const [exactInChildren, exactInStudents] = await Promise.all([
-      getDoc(doc(db, "children", expectedChildId)),
-      getDoc(doc(db, "students", expectedChildId)),
-    ]);
+    const exactInChildren = await getDoc(doc(db, "children", expectedChildId));
 
     if (exactInChildren.exists()) {
       const data = exactInChildren.data() as Record<string, unknown>;
@@ -71,35 +68,13 @@ async function findChildForParent(parentId: string) {
         });
       }
     }
-
-    if (exactInStudents.exists()) {
-      const data = exactInStudents.data() as Record<string, unknown>;
-      if (!data.parentId || data.parentId === parentId) {
-        return buildParentChildInfo(parentId, {
-          id: exactInStudents.id,
-          data: () => data,
-        });
-      }
-    }
   }
 
-  const [inChildren, inStudents] = await Promise.all([
-    getDocs(query(collection(db, "children"), where("parentId", "==", parentId))),
-    getDocs(query(collection(db, "students"), where("parentId", "==", parentId))),
-  ]);
+  const inChildren = await getDocs(query(collection(db, "children"), where("parentId", "==", parentId)));
 
   if (!inChildren.empty) {
     const preferred = expectedChildId ? inChildren.docs.find((d) => d.id === expectedChildId) : undefined;
     const chosen = preferred || [...inChildren.docs].sort((a, b) => a.id.localeCompare(b.id, "vi"))[0];
-    return buildParentChildInfo(parentId, {
-      id: chosen.id,
-      data: () => chosen.data() as Record<string, unknown>,
-    });
-  }
-
-  if (!inStudents.empty) {
-    const preferred = expectedChildId ? inStudents.docs.find((d) => d.id === expectedChildId) : undefined;
-    const chosen = preferred || [...inStudents.docs].sort((a, b) => a.id.localeCompare(b.id, "vi"))[0];
     return buildParentChildInfo(parentId, {
       id: chosen.id,
       data: () => chosen.data() as Record<string, unknown>,

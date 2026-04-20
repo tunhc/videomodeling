@@ -41,11 +41,13 @@ export default function VideoUploadModal({
   const [video, setVideo] = useState<File | null>(null);
   const [uploadError, setUploadError] = useState("");
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isChecking, setIsChecking] = useState(false);
+  const [videoDuration, setVideoDuration] = useState<number>(0);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const emotions = ["Vui vẻ", "Bình thường", "Căng thẳng", "Khóc/Quấy", "Kích động", "Sợ hãi"];
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setUploadError("");
@@ -62,8 +64,53 @@ export default function VideoUploadModal({
         return;
       }
 
-      setVideo(file);
-      setStep("labeling");
+      setIsChecking(true);
+      try {
+        const duration = await new Promise<number>((resolve) => {
+          const tempVideo = document.createElement("video");
+          tempVideo.preload = "metadata";
+          tempVideo.src = URL.createObjectURL(file);
+          
+          const timeout = setTimeout(() => {
+            resolve(0);
+            URL.revokeObjectURL(tempVideo.src);
+          }, 5000);
+
+          tempVideo.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            resolve(tempVideo.duration);
+            URL.revokeObjectURL(tempVideo.src);
+          };
+
+          tempVideo.onerror = () => {
+            clearTimeout(timeout);
+            resolve(0);
+            URL.revokeObjectURL(tempVideo.src);
+          };
+        });
+
+        if (duration < 15 || duration > 300) {
+          const minutes = Math.floor(duration / 60);
+          const seconds = Math.round(duration % 60);
+          const durationStr = duration > 0 ? `${minutes} phút ${seconds} giây` : "không xác định";
+          
+          setUploadError(
+            `Thời lượng video của bạn (${durationStr}) không nằm trong khoảng yêu cầu. ` +
+            "Vui lòng xem lại và chọn video từ 15 giây đến 5 phút để đảm bảo chất lượng phân tích."
+          );
+          setVideo(null);
+          e.target.value = "";
+          return;
+        }
+
+        setVideoDuration(duration);
+        setVideo(file);
+        setStep("labeling");
+      } catch (err) {
+        setUploadError("Có lỗi xảy ra khi kiểm tra video. Vui lòng thử lại.");
+      } finally {
+        setIsChecking(false);
+      }
     }
   };
 
@@ -90,31 +137,8 @@ export default function VideoUploadModal({
     abortControllerRef.current = new AbortController();
     
     try {
-      // 1. Extract duration
-      const duration = await new Promise<number>((resolve) => {
-        const tempVideo = document.createElement("video");
-        tempVideo.preload = "metadata";
-        tempVideo.src = URL.createObjectURL(video);
-        
-        tempVideo.onloadedmetadata = () => {
-          if (tempVideo.duration > 0) {
-             resolve(tempVideo.duration);
-             URL.revokeObjectURL(tempVideo.src);
-          }
-        };
-
-        tempVideo.onloadeddata = () => {
-          if (tempVideo.duration > 0) {
-             resolve(tempVideo.duration);
-             URL.revokeObjectURL(tempVideo.src);
-          }
-        };
-
-        setTimeout(() => {
-          if (tempVideo.duration > 0) resolve(tempVideo.duration);
-          else resolve(0);
-        }, 3000);
-      });
+      // Use pre-extracted duration
+      const duration = videoDuration;
 
       // Resolve Child Metadata for Cloudinary Folder Organization
       let activeChildId = childId;
@@ -294,19 +318,34 @@ export default function VideoUploadModal({
                 ) : (
                   <p className="text-xs text-amber-600 font-bold">Giới hạn hiện tại: theo cấu hình Cloudinary của hệ thống.</p>
                 )}
+
+                <div className="mt-4 space-y-1.5 border-l-2 border-indigo-100 pl-4 py-1">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-gray-400">Lưu ý cho video:</p>
+                  <ul className="text-xs space-y-1 text-gray-600 font-medium">
+                    <li>• <span className="text-red-500 font-bold">Thời gian video: 15 giây - 5 phút</span></li>
+                    <li>• Chất lượng rõ nét</li>
+                    <li>• Ánh sáng đầy đủ</li>
+                    <li>• Bao gồm góc quay chính diện hoặc góc quay 45 độ</li>
+                    <li>• Hạn chế rung lắc video</li>
+                  </ul>
+                </div>
               </div>
               
               <label 
                 htmlFor="video-input"
-                className="border-4 border-dashed border-indigo-50 bg-indigo-50/20 rounded-[40px] h-72 flex flex-col items-center justify-center gap-6 cursor-pointer hover:bg-indigo-100/50 transition-all group"
+                className={`border-4 border-dashed border-indigo-50 bg-indigo-50/20 rounded-[40px] h-72 flex flex-col items-center justify-center gap-6 cursor-pointer hover:bg-indigo-100/50 transition-all group ${isChecking ? 'opacity-50 pointer-events-none' : ''}`}
               >
-                <input type="file" id="video-input" accept="video/*" hidden onChange={handleFileChange} />
+                <input type="file" id="video-input" accept="video/*" hidden onChange={handleFileChange} disabled={isChecking} />
                 <div className="w-20 h-20 bg-primary text-white rounded-3xl flex items-center justify-center shadow-hpdt group-hover:scale-110 transition-transform">
-                  <Upload size={32} />
+                  {isChecking ? <Loader2 size={32} className="animate-spin" /> : <Upload size={32} />}
                 </div>
                 <div className="text-center">
-                  <p className="font-extrabold text-indigo-900 text-lg">Chọn video / Kéo thả</p>
-                  <p className="text-[10px] text-indigo-300 font-black uppercase tracking-[0.3em] mt-2 italic">An toàn • Tốc độ Cloudinary</p>
+                  <p className="font-extrabold text-indigo-900 text-lg">
+                    {isChecking ? "Đang kiểm tra video..." : "Chọn video / Kéo thả"}
+                  </p>
+                  <p className="text-[10px] text-indigo-300 font-black uppercase tracking-[0.3em] mt-2 italic">
+                    {isChecking ? "Vui lòng đợi trong giây lát" : "An toàn • Tốc độ Cloudinary"}
+                  </p>
                 </div>
               </label>
 

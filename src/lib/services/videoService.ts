@@ -44,6 +44,10 @@ export const videoService = {
     metadata: Partial<VideoMetadata>,
     role: Role
   ) {
+    if (videoUrl.startsWith("data:")) {
+      throw new Error("Không hỗ trợ lưu trữ video dưới dạng Base64. Vui lòng upload lên Cloudinary để lấy link HTTP chuẩn.");
+    }
+
     // 1. Resolve Teacher ID for this child for data isolation
     let assignedTeacherId = metadata.teacherId || "";
     let assignedTeacherIds = mergeTeacherIds(

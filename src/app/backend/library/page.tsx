@@ -52,7 +52,7 @@ export default function BackendLibraryIntakePage() {
   const fetchDocuments = async (childId: string) => {
     setLoadingDocs(true);
     try {
-      const docsSnap = await getDocs(query(collection(db, "child_exercises"), where("childId", "==", childId)));
+      const docsSnap = await getDocs(query(collection(db, "lessons"), where("childId", "==", childId), where("source", "==", "manual")));
       const rows: LibraryItem[] = docsSnap.docs
         .map((docSnap): LibraryItem => {
           const data = docSnap.data();
@@ -179,7 +179,7 @@ export default function BackendLibraryIntakePage() {
 
       // Step 3: Save metadata + parsed exercises/behaviors to Firestore
       const now = new Date();
-      await addDoc(collection(db, "child_exercises"), {
+      await addDoc(collection(db, "lessons"), {
         childId: selectedChild.id,
         childName: selectedChild.name,
         fileName: file.name,
@@ -190,6 +190,7 @@ export default function BackendLibraryIntakePage() {
         uploadedBy: adminId,
         uploadedByRole: "admin",
         createdAt: now,
+        source: "manual",
       });
 
       setLastResult({ fileName: file.name, exercises: foundExercises, behaviors });
@@ -214,7 +215,7 @@ export default function BackendLibraryIntakePage() {
     try {
       // Note: Ideal implementation would also delete the file from Storage using 'deleteObject' tracking 'storagePath'
       // But we will stick to basic Firestore document deletion for now to keep it safe.
-      await deleteDoc(doc(db, "child_exercises", docId));
+      await deleteDoc(doc(db, "lessons", docId));
       await fetchDocuments(selectedChildId);
     } catch (deleteError) {
       const message = deleteError instanceof Error ? deleteError.message : "Không xác định";

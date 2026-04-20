@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import VideoUploadModal from "@/components/VideoUploadModal";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { generateWeeklyScheduleAction, generateLessonPlanAction } from "@/app/actions/gemini";
 import { getLearnersForTeacher } from "@/lib/services/learnerService";
 
@@ -18,6 +18,7 @@ interface Activity {
   description: string;
   domain: string;
   requiresModeling: boolean;
+  objective?: string;
 }
 
 interface DaySchedule {
@@ -39,6 +40,13 @@ export default function TeacherSchedule() {
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [selectedActivityForPlan, setSelectedActivityForPlan] = useState<Activity | null>(null);
 
+  // Clinical & Lesson States
+  const [latestAnalysis, setLatestAnalysis] = useState<any>(null);
+  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
+  const [taskNotes, setTaskNotes] = useState<Record<string, string>>({});
+  const [expandedExercises, setExpandedExercises] = useState<string[]>([]);
+  const [savingStep, setSavingStep] = useState<string | null>(null);
+
   const userId = typeof window !== 'undefined' ? localStorage.getItem("userId") || "" : "";
   const userRole = typeof window !== 'undefined' ? localStorage.getItem("userRole") || "teacher" : "teacher";
 
@@ -58,11 +66,103 @@ export default function TeacherSchedule() {
     loadChildren();
   }, [userId, userRole]);
 
-  // 2. Load Weekly Schedule when child changes
+  // 2. Load Weekly Schedule & Clinical Plan when child changes
   useEffect(() => {
     if (!selectedChild) return;
     loadWeeklySchedule(selectedChild.id, false);
+    loadClinicalPlan(selectedChild.id);
   }, [selectedChild]);
+
+  async function loadClinicalPlan(childId: string) {
+    try {
+      // Fetch latest analysis
+      const q = query(
+        collection(db, "video_analysis"), 
+        where("childId", "==", childId)
+      );
+      const aSnap = await getDocs(q);
+      if (!aSnap.empty) {
+        const analyses = aSnap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a: any, b: any) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+        setLatestAnalysis(analyses[0]);
+      } else {
+        setLatestAnalysis(null);
+      }
+
+      // Fetch progress (Both Clinical and Weekly)
+      const pQ = query(collection(db, "exercise_logs"), where("childId", "==", childId));
+      const pSnap = await getDocs(pQ);
+      const completed: string[] = [];
+      const notes: Record<string, string> = {};
+      pSnap.forEach(d => {
+        const data = d.data();
+        if (data.status === "teacher_done" || data.status === "both_done") {
+          completed.push(data.stepId);
+        }
+        if (data.note) notes[data.stepId] = data.note;
+      });
+      setCompletedTasks(completed);
+      setTaskNotes(notes);
+    } catch (e) {
+      console.error("Load clinical plan failed:", e);
+    }
+  }
+
+  const toggleExpand = (id: string) => {
+    setExpandedExercises(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const saveStepProgress = async (stepId: string, isDone: boolean, additionalData?: any) => {
+    if (!selectedChild?.id) return;
+    setSavingStep(stepId);
+    try {
+      const logRef = doc(collection(db, "exercise_logs"), `${selectedChild.id}_${stepId}`);
+      
+      const existing = await getDoc(logRef);
+      let status = isDone ? "teacher_done" : "pending";
+      
+      if (existing.exists()) {
+        const eData = existing.data();
+        if (isDone && eData.status === "parent_done") status = "both_done";
+        else if (!isDone && eData.status === "both_done") status = "parent_done";
+      }
+
+      const logData = {
+        childId: selectedChild.id,
+        stepId,
+        status,
+        note: taskNotes[stepId] || "",
+        updatedAt: new Date(),
+        teacherId: userId,
+        teacherName: "Giáo viên",
+        ...additionalData
+      };
+
+      await setDoc(logRef, logData, { merge: true });
+
+      if (isDone) {
+        setCompletedTasks(prev => prev.includes(stepId) ? prev : [...prev, stepId]);
+      } else {
+        setCompletedTasks(prev => prev.filter(s => s !== stepId));
+      }
+    } catch (e) {
+      console.error("Failed to save progress:", e);
+    } finally {
+      setSavingStep(null);
+    }
+  };
+
+  const handleUploadSuccess = (exerciseId: string, activity: any) => {
+    // Auto-complete the card when video is uploaded
+    saveStepProgress(exerciseId, true, {
+      title: activity.title,
+      objective: activity.objective || activity.description,
+      type: "video_modeling_complete"
+    });
+  };
 
   async function loadWeeklySchedule(childId: string, refresh: boolean) {
     setFetchingSchedule(true);
@@ -203,66 +303,236 @@ export default function TeacherSchedule() {
            <p className="text-sm font-black text-gray-900 uppercase tracking-tighter italic">AI đang kiến tạo lộ trình 7 ngày...</p>
         </div>
       ) : (
-        <div className="space-y-12">
-          {weeklySchedule.map((day, dIdx) => (
-            <section key={dIdx} className="space-y-6">
-               <div className="flex items-center gap-6">
-                  <div className="bg-primary text-white w-20 h-20 rounded-[28px] flex flex-col items-center justify-center shadow-lg shadow-primary/20">
-                     <span className="text-[10px] font-black uppercase opacity-60">Day</span>
-                     <span className="text-2xl font-black">{dIdx + 1}</span>
-                  </div>
-                  <div>
-                     <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none">{day.day}</h3>
-                     <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5 italic">Lộ trình 3 bài tập chuẩn ABA • Tiết 1, 2, 3</p>
-                  </div>
-               </div>
+        <div className="space-y-16">
+          {/* Clinical Intervention Section (Copy from Parent Home) */}
+          <section className="space-y-8">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-200">
+                  <Target size={24} />
+                </div>
+                <div>
+                  <h3 className="text-3xl font-black text-gray-900 tracking-tight">Kế hoạch can thiệp cá nhân</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Lộ trình bài học từ AI Analysis</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {["ABA", "OT", "DIR"].map(t => (
+                  <span key={t} className="text-[10px] font-black text-gray-400 bg-gray-100 px-3 py-1 rounded-lg uppercase">{t}</span>
+                ))}
+              </div>
+            </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {day.activities.map((activity, aIdx) => (
-                    <motion.div
-                      key={aIdx}
-                      initial={{ y: 20, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ delay: aIdx * 0.1 }}
-                      className="bg-white rounded-[40px] p-8 border border-gray-50 shadow-soft hover:shadow-premium transition-all group flex flex-col relative"
-                    >
-                      <div className="flex justify-between items-start mb-6">
-                         <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${domainColors[activity.domain] || "bg-gray-50 text-gray-500"}`}>
-                            {activity.domain}
-                         </span>
-                         {activity.requiresModeling && (
-                           <div className="bg-yellow-50 text-yellow-600 p-2 rounded-xl" title="Yêu cầu Video Modeling">
-                              <Star size={14} className="fill-yellow-600" />
-                           </div>
-                         )}
+            <div className="space-y-6">
+              {latestAnalysis?.clinicalAnalysis?.interventions?.map((act: any, idx: number) => {
+                const exerciseId = act.title || `ex-${idx}`;
+                const isExpanded = expandedExercises.includes(exerciseId);
+                const steps = act.steps || [];
+                const completedCount = steps.filter((s: string) => completedTasks.includes(`${exerciseId}-${s}`)).length;
+
+                return (
+                  <motion.div key={exerciseId} layout className="bg-white rounded-[40px] shadow-soft border border-gray-50 overflow-hidden">
+                    <div onClick={() => toggleExpand(exerciseId)} className="p-8 cursor-pointer hover:bg-gray-50 transition-all">
+                      <div className="flex items-start justify-between gap-6">
+                        <div className="flex items-start gap-6 flex-1">
+                          <div className="w-14 h-14 rounded-full bg-indigo-500 text-white flex items-center justify-center text-2xl font-black shadow-lg shadow-indigo-100 shrink-0">
+                            {idx + 1}
+                          </div>
+                          <div className="space-y-3 flex-1">
+                            <div className="flex items-center justify-between">
+                              <h4 className="text-xl font-black text-gray-900 leading-tight">
+                                {act.title}
+                              </h4>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400 font-black text-sm">{completedCount}/{steps.length}</span>
+                                <ChevronRight size={20} className={`text-gray-300 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <span className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-lg uppercase">
+                                {act.therapies?.join(", ") || "ABA/VB"}
+                              </span>
+                              <span className="bg-orange-50 text-orange-600 text-[10px] font-black px-3 py-1 rounded-lg uppercase">
+                                Mục tiêu AI
+                              </span>
+                            </div>
+                            <p className="text-gray-500 font-medium leading-relaxed text-sm">
+                              {act.objective}
+                            </p>
+                          </div>
+                        </div>
                       </div>
+                    </div>
 
-                      <h4 className="text-lg font-black text-gray-900 tracking-tight leading-snug mb-3">{activity.title}</h4>
-                      <p className="text-[11px] font-medium text-gray-500 leading-relaxed italic mb-8 flex-1">
-                         "{activity.description}"
-                      </p>
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="border-t border-gray-50"
+                        >
+                          <div className="p-8 bg-gray-50/30 space-y-8">
+                            <div className="flex items-center gap-2 text-indigo-600">
+                              <Sparkles size={16} />
+                              <h5 className="text-[10px] font-black uppercase tracking-widest">Các bước thực hiện tại trường</h5>
+                            </div>
+                            <div className="space-y-8">
+                              {steps.map((step: string, sIdx: number) => {
+                                const stepId = `${exerciseId}-${step}`;
+                                const isStepDone = completedTasks.includes(stepId);
+                                const isSaving = savingStep === stepId;
+                                return (
+                                  <div key={sIdx} className="flex gap-6 group">
+                                    <button
+                                      onClick={() => saveStepProgress(stepId, !isStepDone)}
+                                      disabled={isSaving}
+                                      className={`w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                                        isStepDone ? "bg-emerald-500 border-emerald-500 text-white" : "bg-white border-gray-100 text-gray-300 group-hover:border-indigo-300"
+                                      } ${isSaving ? "animate-pulse" : ""}`}
+                                    >
+                                      {isSaving ? <Loader2 className="animate-spin" size={16} /> :
+                                       isStepDone ? <CheckCircle size={20} /> : <span className="text-sm font-black">{sIdx + 1}</span>}
+                                    </button>
+                                    <div className="space-y-2 flex-1">
+                                      <h6 className={`text-lg font-bold leading-tight transition-colors ${isStepDone ? "text-gray-300 line-through" : "text-gray-900"}`}>
+                                        {step}
+                                      </h6>
+                                      {!isStepDone && (
+                                        <p className="text-[11px] font-bold text-indigo-500 leading-relaxed italic">
+                                          HD: Quan sát kỹ phản ứng của bé và ghi chú nếu có hành vi mới.
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                );
+              })}
+              
+              {!latestAnalysis && (
+                <div className="bg-white/50 border-2 border-dashed border-gray-200 rounded-[40px] p-16 text-center">
+                  <Info className="mx-auto text-gray-300 mb-4" size={40} />
+                  <p className="text-sm font-black text-gray-400 uppercase tracking-widest">Chưa có kế hoạch can thiệp từ AI</p>
+                  <p className="text-xs text-gray-300 mt-2">Vui lòng thực hiện phân tích video để AI kiến tạo bài học.</p>
+                </div>
+              )}
+            </div>
+          </section>
 
-                      <div className="space-y-3">
-                         <button 
-                            onClick={() => showLessonPlan(activity)}
-                            className="w-full bg-white border border-gray-100 text-gray-600 py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all"
-                         >
-                            <BookOpen size={16} /> Giáo án AI
-                         </button>
-                         {activity.requiresModeling && (
-                           <button 
-                              onClick={() => handleUploadClick(activity.title)}
-                              className="w-full bg-primary text-white py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.03] transition-all"
-                           >
-                              <Upload size={18} /> Quay Video Modeling
-                           </button>
-                         )}
+          {/* Weekly Schedule Section */}
+          <section className="space-y-8 pt-8 border-t border-gray-100">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+                <Calendar size={24} />
+              </div>
+              <div>
+                <h3 className="text-3xl font-black text-gray-900 tracking-tight">Lịch trình 7 ngày (AI)</h3>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Lộ trình tổng quát tuần này</p>
+              </div>
+            </div>
+
+            <div className="space-y-12">
+              {weeklySchedule.map((day, dIdx) => (
+                <section key={dIdx} className="space-y-6">
+                  <div className="flex items-center gap-6">
+                      <div className="bg-primary text-white w-20 h-20 rounded-[28px] flex flex-col items-center justify-center shadow-lg shadow-primary/20">
+                        <span className="text-[10px] font-black uppercase opacity-60">Day</span>
+                        <span className="text-2xl font-black">{dIdx + 1}</span>
                       </div>
-                    </motion.div>
-                  ))}
-               </div>
-            </section>
-          ))}
+                      <div>
+                        <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none">{day.day}</h3>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1.5 italic">Lộ trình 3 bài tập chuẩn ABA • Tiết 1, 2, 3</p>
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {day.activities.map((activity, aIdx) => (
+                        <motion.div
+                          key={aIdx}
+                          initial={{ y: 20, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          transition={{ delay: aIdx * 0.1 }}
+                          className="bg-white rounded-[40px] p-8 border border-gray-50 shadow-soft hover:shadow-premium transition-all group flex flex-col relative"
+                        >
+                          <div className="flex justify-between items-start mb-6">
+                            <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${domainColors[activity.domain] || "bg-gray-50 text-gray-500"}`}>
+                                {activity.domain}
+                            </span>
+                            {activity.requiresModeling && (
+                              <div className="bg-yellow-50 text-yellow-600 p-2 rounded-xl" title="Yêu cầu Video Modeling">
+                                  <Star size={14} className="fill-yellow-600" />
+                              </div>
+                            )}
+                          </div>
+
+                          <h4 className="text-lg font-black text-gray-900 tracking-tight leading-snug mb-3">{activity.title}</h4>
+                          <p className="text-[11px] font-medium text-gray-500 leading-relaxed italic mb-8 flex-1">
+                            "{activity.description}"
+                          </p>
+                          <div className="space-y-4 mt-auto pt-4 border-t border-gray-50">
+                         <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Trạng thái</span>
+                            <div className={`flex items-center gap-1.5 text-[10px] font-black uppercase ${completedTasks.includes(`weekly_${dIdx}_${aIdx}`) ? "text-emerald-500" : "text-gray-400"}`}>
+                               <CheckCircle size={14} /> {completedTasks.includes(`weekly_${dIdx}_${aIdx}`) ? "Hoàn tất" : "Chưa dạy"}
+                            </div>
+                         </div>
+                         
+                         <div className="space-y-3">
+                            <button 
+                               onClick={() => showLessonPlan(activity)}
+                               className="w-full bg-white border border-gray-100 text-gray-600 py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all"
+                            >
+                               <BookOpen size={16} /> Giáo án AI
+                            </button>
+                            
+                            {activity.requiresModeling ? (
+                              <button 
+                                  onClick={() => handleUploadClick(`weekly_${dIdx}_${aIdx}`)}
+                                  className="w-full bg-primary text-white py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-[1.03] transition-all"
+                              >
+                                  <Upload size={18} /> Quay Video Modeling
+                              </button>
+                            ) : (
+                              <div className="space-y-3">
+                                <textarea 
+                                  placeholder="Ghi chú kết quả tiết dạy..."
+                                  value={taskNotes[`weekly_${dIdx}_${aIdx}`] || ""}
+                                  onChange={(e) => setTaskNotes(prev => ({ ...prev, [`weekly_${dIdx}_${aIdx}`]: e.target.value }))}
+                                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-xs font-medium focus:ring-2 focus:ring-primary/10 transition-all min-h-[80px] resize-none"
+                                />
+                                <button 
+                                  onClick={() => saveStepProgress(`weekly_${dIdx}_${aIdx}`, !completedTasks.includes(`weekly_${dIdx}_${aIdx}`), {
+                                    title: activity.title,
+                                    objective: activity.description
+                                  })}
+                                  disabled={savingStep === `weekly_${dIdx}_${aIdx}`}
+                                  className={`w-full py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all ${
+                                    completedTasks.includes(`weekly_${dIdx}_${aIdx}`)
+                                      ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                                      : "bg-gray-900 text-white shadow-xl hover:bg-gray-800"
+                                  }`}
+                                >
+                                  {savingStep === `weekly_${dIdx}_${aIdx}` ? <Loader2 className="animate-spin" size={14} /> : <CheckCircle size={14} />}
+                                  {completedTasks.includes(`weekly_${dIdx}_${aIdx}`) ? "Đã lưu hoàn tất" : "Xác nhận hoàn tất tiết dạy"}
+                                </button>
+                              </div>
+                            )}
+                         </div>
+                      </div>
+                        </motion.div>
+                      ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </section>
         </div>
       )}
 
@@ -335,6 +605,22 @@ export default function TeacherSchedule() {
         onClose={() => setIsUploadOpen(false)} 
         childId={selectedChild?.id}
         initialTopic={activeTopic}
+        onSuccess={() => {
+          // Find the activity to get its details for database
+          const clinicalAct = latestAnalysis?.clinicalAnalysis?.interventions?.find((i: any) => i.title === activeTopic);
+          if (clinicalAct) {
+            handleUploadSuccess(activeTopic, clinicalAct);
+          } else {
+            // Check weekly schedule
+            weeklySchedule.forEach((day, dIdx) => {
+              day.activities.forEach((act, aIdx) => {
+                if (`weekly_${dIdx}_${aIdx}` === activeTopic) {
+                  handleUploadSuccess(activeTopic, act);
+                }
+              });
+            });
+          }
+        }}
       />
     </div>
   );

@@ -3,518 +3,695 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, Play, ChevronRight, Video, CheckCircle2, Zap, Camera, MessageCircle, X, Loader2, Trash2, Calendar, Star, RefreshCw, Sparkles } from "lucide-react";
-import HPDTBrainCard from "@/components/hpdt/HPDTBrainCard";
-import ActivityItem from "@/components/parent/ActivityItem";
+import {
+  Bell, ChevronRight, Brain, Target, Compass,
+  Sparkles, Camera, CheckCircle2, Zap, ArrowRight,
+  Clock, Save, Loader2, Plus, X
+} from "lucide-react";
+import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from "firebase/firestore";
+import { resolveLearnerForParent } from "@/lib/services/learnerService";
+import { cloudinaryService } from "@/lib/services/cloudinaryService";
 import VideoUploadModal from "@/components/VideoUploadModal";
 import UserMenu from "@/components/layout/UserMenu";
-import { subscribeToTasks, acknowledgeTask, CollaborationTask } from "@/lib/services/taskService";
-import { videoService } from "@/lib/services/videoService";
-import { db } from "@/lib/firebase";
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { generateWeeklyScheduleAction } from "@/app/actions/gemini";
-import { cloudinaryService } from "@/lib/services/cloudinaryService";
-import { resolveLearnerForParent } from "@/lib/services/learnerService";
-import {
-  formatFirestoreLikeDate,
-  normalizeWordInsights,
-  type LatestWordInsights,
-} from "@/lib/word-insights";
-
-interface Activity {
-  title: string;
-  description: string;
-  domain: string;
-  requiresModeling: boolean;
-}
-
-function priorityLabel(priority: "high" | "medium" | "low") {
-  if (priority === "high") return "Ưu tiên cao";
-  if (priority === "medium") return "Ưu tiên vừa";
-  return "Theo dõi";
-}
+import { Play, Trash2 } from "lucide-react";
 
 export default function ParentHome() {
   const router = useRouter();
   const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [tasks, setTasks] = useState<CollaborationTask[]>([]);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [prevTaskCount, setPrevTaskCount] = useState(0);
-  
+  const [viewingVideo, setViewingVideo] = useState<{ url: string; title: string } | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [videoModelingSessions, setVideoModelingSessions] = useState<any[]>([]);
-  const [loadingVideos, setLoadingVideos] = useState(true);
+  const [latestAnalysis, setLatestAnalysis] = useState<any>(null);
+  const [videos, setVideos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [weeklySchedule, setWeeklySchedule] = useState<any[]>([]);
-  const [loadingSchedule, setLoadingSchedule] = useState(true);
-  const [generatingWeekly, setGeneratingWeekly] = useState(false);
-  const [activeUploadTopic, setActiveUploadTopic] = useState("");
-  const [wordInsights, setWordInsights] = useState<LatestWordInsights | null>(null);
+  const [completedTasks, setCompletedTasks] = useState<string[]>([]);
+  const [taskNotes, setTaskNotes] = useState<Record<string, string>>({});
+  const [expandedExercises, setExpandedExercises] = useState<string[]>([]);
+  const [savingStep, setSavingStep] = useState<string | null>(null);
 
-  const openVideoReplay = (video: { id: string; url?: string }) => {
-    const url = typeof video.url === "string" ? video.url.trim() : "";
-    const isAbsoluteUrl = /^https?:\/\//i.test(url);
-
-    if (isAbsoluteUrl) {
-      window.open(url, "_blank", "noopener,noreferrer");
-      return;
-    }
-
-    // Fallback: avoid opening a relative/invalid URL that triggers Next.js 404.
-    router.push(`/parent/analyze?id=${video.id}`);
+  const toggleExpand = (id: string) => {
+    setExpandedExercises(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
   };
 
-  // 1. Load User Profile
+  const saveStepProgress = async (stepId: string, isDone: boolean) => {
+    if (!userProfile?.childId) return;
+    setSavingStep(stepId);
+    try {
+      const logRef = doc(collection(db, "exercise_logs"), `${userProfile.childId}_${stepId}`);
+      await setDoc(logRef, {
+        childId: userProfile.childId,
+        stepId,
+        status: isDone ? "parent_done" : "pending",
+        note: taskNotes[stepId] || "",
+        updatedAt: new Date(),
+        parentName: userProfile.displayName || "Phụ huynh",
+      }, { merge: true });
+      if (isDone) {
+        setCompletedTasks(prev => prev.includes(stepId) ? prev : [...prev, stepId]);
+      } else {
+        setCompletedTasks(prev => prev.filter(s => s !== stepId));
+      }
+    } catch (e) {
+      console.error("Failed to save step progress:", e);
+    } finally {
+      setSavingStep(null);
+    }
+  };
+
+  const handleDeleteVideo = async (videoId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Bạn có chắc muốn xóa video này không?")) return;
+    try {
+      const videoRef = doc(db, "video_modeling", videoId);
+      const videoSnap = await getDoc(videoRef);
+      if (!videoSnap.exists()) return;
+      const videoData = videoSnap.data();
+      const createdAt = videoData.createdAt?.toDate() || new Date();
+      const diffMs = new Date().getTime() - createdAt.getTime();
+      if (diffMs > 3600000 && userProfile.role !== "admin") {
+        alert("Chỉ có thể xóa video trong vòng 1 giờ sau khi tải lên.");
+        return;
+      }
+      await deleteDoc(videoRef);
+      setVideos(prev => prev.filter(v => v.id !== videoId));
+    } catch (err) {
+      console.error("Delete failed:", err);
+      alert("Xóa thất bại. Vui lòng thử lại.");
+    }
+  };
+
+  // Load progress
+  useEffect(() => {
+    if (!userProfile?.childId) return;
+    const loadProgress = async () => {
+      try {
+        const q = query(collection(db, "exercise_logs"), where("childId", "==", userProfile.childId));
+        const snap = await getDocs(q);
+        const completed: string[] = [];
+        const notes: Record<string, string> = {};
+        snap.forEach(d => {
+          const data = d.data();
+          if (data.status === "parent_done") completed.push(data.stepId);
+          if (data.note) notes[data.stepId] = data.note;
+        });
+        setCompletedTasks(completed);
+        setTaskNotes(notes);
+      } catch (e) {
+        console.error("Error loading progress:", e);
+      }
+    };
+    loadProgress();
+  }, [userProfile?.childId]);
+
+  // Load main data
   useEffect(() => {
     const userId = localStorage.getItem("userId");
-    const userRole = localStorage.getItem("userRole") as any;
-
-    if (!userId) {
-      setLoadingVideos(false);
-      setLoadingSchedule(false);
-      return;
-    }
+    if (!userId) { setLoading(false); return; }
 
     async function loadData() {
       try {
         const docRef = doc(db, "users", userId as string);
         const snap = await getDoc(docRef);
-        let profile: any = null;
-        
-        if (snap.exists()) {
-          profile = { id: snap.id, role: userRole, ...snap.data() };
-        } else {
-          profile = { id: userId, role: userRole, childId: (userId as string).replace("PH_", "") };
-        }
+        let profile: any = { id: userId };
+        if (snap.exists()) profile = { ...profile, ...snap.data() };
 
         const learner = await resolveLearnerForParent(userId as string, profile?.childId);
         if (learner) {
           profile.childId = learner.id;
           profile.childName = learner.name;
-          profile.displayName = `PH ${learner.name}`;
-          profile.teacherId = learner.teacherId || profile.teacherId;
-          setWordInsights(normalizeWordInsights(learner.latestWordInsights));
-        }
+          profile.childAvatar = learner.avatarUrl || "";
+          profile.regulationLevel = "Ổn định";
 
+          let finalScore = 75;
+          const statsRef = doc(db, "hpdt_stats", learner.id);
+          const statsSnap = await getDoc(statsRef);
+          if (statsSnap.exists()) {
+            finalScore = statsSnap.data().overallScore || statsSnap.data().overall || finalScore;
+          } else {
+            const statsQuery = query(collection(db, "hpdt_stats"), where("childId", "==", learner.id));
+            const statsResult = await getDocs(statsQuery);
+            if (!statsResult.empty) {
+              const sData = statsResult.docs[0].data();
+              finalScore = sData.overallScore || sData.overall || finalScore;
+            }
+          }
+          if (finalScore === 75 && learner.hpdt) finalScore = learner.hpdt;
+          profile.hpdt = finalScore;
+        }
         setUserProfile(profile);
 
-        // Fetch Schedule
-        if (profile && profile.childId) {
-          const scheduleRef = doc(db, "weekly_schedules", profile.childId);
-          const scheduleSnap = await getDoc(scheduleRef);
-          if (scheduleSnap.exists()) {
-            setWeeklySchedule(scheduleSnap.data().days || []);
+        // Analyses
+        if (profile.childId) {
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          const q = query(collection(db, "video_analysis"), where("childId", "==", profile.childId));
+          const aSnap = await getDocs(q);
+          const sevenDaysAgoTime = sevenDaysAgo.getTime();
+          const analyses = aSnap.docs
+            .map(d => d.data())
+            .filter((a: any) => (a.createdAt?.toDate()?.getTime() || 0) >= sevenDaysAgoTime)
+            .sort((a: any, b: any) => (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0));
+
+          if (analyses.length > 0) {
+            const tagCounts: Record<string, number> = {};
+            const behaviorCounts: Record<string, number> = {};
+            analyses.forEach((a: any) => {
+              a.frameAnalysis?.tags?.forEach((tag: string) => { tagCounts[tag] = (tagCounts[tag] || 0) + 1; });
+              const behavior = a.fullAnalysis?.summary?.dominantBehavior;
+              if (behavior) behaviorCounts[behavior] = (behaviorCounts[behavior] || 0) + 1;
+            });
+            const topStrengths = Object.entries(tagCounts).sort(([, a], [, b]) => b - a).map(([tag]) => tag);
+            const topChallenges = Object.entries(behaviorCounts).sort(([, a], [, b]) => b - a).map(([b]) => b);
+            const latest = analyses[0];
+            setLatestAnalysis({
+              ...latest,
+              aggregated: { strengths: topStrengths.slice(0, 2), challenges: topChallenges[0] || "Đang theo dõi", videoCount: analyses.length }
+            });
+            if (latest.fullAnalysis?.summary?.regulationLevel) {
+              profile.regulationLevel = latest.fullAnalysis.summary.regulationLevel;
+              setUserProfile({ ...profile });
+            }
           }
+        }
+
+        // Videos
+        if (profile.childId) {
+          const vQuery = query(collection(db, "video_modeling"), where("childId", "==", profile.childId));
+          const vSnap = await getDocs(vQuery);
+          const vList = vSnap.docs
+            .map(d => {
+              const raw = d.data() as any;
+              const videoUrl = raw.url ? cloudinaryService.deobfuscateUrl(raw.url) : "";
+              const rawThumb = raw.thumbnail || "";
+              const thumbDecoded = rawThumb ? cloudinaryService.deobfuscateUrl(rawThumb) : "";
+              const thumbnail = thumbDecoded.startsWith("http")
+                ? thumbDecoded
+                : videoUrl.includes("cloudinary.com")
+                  ? videoUrl.replace(/\.[^./?#]+(\?.*)?$/, ".jpg").replace("/video/upload/", "/video/upload/so_0/")
+                  : "https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&q=80&w=400";
+              return { id: d.id, ...raw, thumbnail, videoUrl };
+            })
+            .sort((a: any, b: any) => (b.createdAt?.toDate()?.getTime() || 0) - (a.createdAt?.toDate()?.getTime() || 0))
+            .slice(0, 10);
+          setVideos(vList);
         }
       } catch (e) {
         console.error("Failed to load parent data:", e);
       } finally {
-        setLoadingSchedule(false);
+        setLoading(false);
       }
     }
     loadData();
   }, []);
 
-  // 2. Load Child Videos
-  useEffect(() => {
-    if (!userProfile) return;
+  const today = new Intl.DateTimeFormat("vi-VN", { weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
-    async function loadChildVideos() {
-      setLoadingVideos(true);
-      try {
-        const list = await videoService.getRecentVideos({
-          role: userProfile.role,
-          userId: userProfile.id,
-          childId: userProfile.childId
-        });
-        
-        const formatted = list.map(v => {
-          const safeUrl = typeof v.url === "string" ? v.url : "";
-          // Cloudinary auto-poster trick: change extension to .jpg or inject so/0 for first frame
-          const thumbnail = safeUrl.replace(/\.(mp4|mov|avi|wmv)$/, ".jpg");
+  const strengths = latestAnalysis?.aggregated?.strengths || ["Giao tiếp mắt"];
+  const strengthsDesc = latestAnalysis?.frameAnalysis?.summary?.substring(0, 50) || "Duy trì tốt hơn trong các trò chơi vận động.";
+  const challenges = latestAnalysis?.aggregated?.challenges || "Âm thanh lớn";
+  const challengesDesc = "Dễ bị choáng ngợp bởi tiếng ồn môi trường xung quanh.";
+  const videoCount = latestAnalysis?.aggregated?.videoCount || 0;
+  const aiAdvice = latestAnalysis?.fullAnalysis?.summary?.overallRecommendation
+    || latestAnalysis?.reportContent?.clinicalNote
+    || `Dựa trên dữ liệu hôm nay, ${userProfile?.childName || "bé"} có xu hướng nhạy cảm với âm thanh. Hãy chuẩn bị tai nghe chống ồn khi đi dạo vào buổi chiều.`;
+  const goals = latestAnalysis?.reportContent?.monthlyPlan?.slice(0, 2) || [
+    { period: "Tháng 4", focus: "Mở rộng vốn từ vựng về chủ đề động vật yêu thích", domain: "GIAO TIẾP" },
+    { period: "Tháng 4", focus: "Nâng cao khả năng tương tác và chơi luân phiên", domain: "XÃ HỘI" },
+  ];
+  const activities = latestAnalysis?.reportContent?.exercises?.slice(0, 2) || [
+    { title: "Vẽ tranh bằng ngón tay", time: "15 phút", category: "Phát triển xúc giác" },
+    { title: "Ghép hình khối cơ bản", time: "10 phút", category: "Tư duy logic" },
+  ];
 
-          return {
-            id: v.id,
-            title: cloudinaryService.extractPublicIdFromUrl(safeUrl),
-            location: v.context === "school" ? "Tại Trường" : "Tại Nhà",
-            time: v.createdAt?.toDate ? v.createdAt.toDate().toLocaleString("vi-VN") : "Gần đây",
-            accuracy: v.status === "Đã phân tích" ? (v.hpdtAverages?.overall || 85) : 0,
-            url: safeUrl,
-            thumbnail: thumbnail,
-            createdAt: v.createdAt
-          };
-        });
-        setVideoModelingSessions(formatted);
-      } catch (e) {
-        console.error("Lỗi load video:", e);
-      } finally {
-        setLoadingVideos(false);
-      }
+  const getAnalysisProgress = (video: any) => {
+    if (video.status === "analyzed" || video.status === "Đã phân tích") return 100;
+    if (video.createdAt) {
+      const elapsed = (Date.now() - (video.createdAt?.toDate?.()?.getTime() || Date.now())) / 1000;
+      if (elapsed < 60) return Math.min(95, Math.floor((elapsed / 60) * 85));
+      return 95;
     }
-    loadChildVideos();
-  }, [userProfile]);
-
-  const handleGenerateWeeklyAI = async () => {
-    if (!userProfile?.childId) return;
-    setGeneratingWeekly(true);
-    try {
-      // 1. Get Child Stats
-      const statsRef = doc(db, "hpdt_stats", userProfile.childId);
-      const statsSnap = await getDoc(statsRef);
-      const rawStats = statsSnap.exists() ? statsSnap.data() : { hpdt: userProfile.hpdt || 75 };
-      const stats = JSON.parse(JSON.stringify(rawStats));
-      
-      // 2. Call AI
-      const aiResponse = await generateWeeklyScheduleAction(stats, userProfile.displayName || "Bé");
-      
-      // 3. Parse JSON
-      let parsedDays: any[] = [];
-      try {
-        const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          parsedDays = JSON.parse(jsonMatch[0]);
-        }
-      } catch (e) {
-        console.error("AI Parse failed:", e);
-      }
-
-      if (parsedDays.length === 0) {
-        // Mock Failover
-        parsedDays = generateMockWeekly();
-        setToastMessage("Đang sử dụng lộ trình mẫu do lỗi kết nối AI.");
-        setShowToast(true);
-      }
-
-      // 4. Save to Firestore
-      const scheduleRef = doc(db, "weekly_schedules", userProfile.childId);
-      await setDoc(scheduleRef, {
-        childId: userProfile.childId,
-        days: parsedDays,
-        updatedAt: new Date()
-      });
-      
-      setWeeklySchedule(parsedDays);
-    } catch (e) {
-      console.error("Generate weekly failed:", e);
-      // Mock Failover
-      const mockDays = generateMockWeekly();
-      setWeeklySchedule(mockDays);
-      setToastMessage("Đang sử dụng lộ trình mẫu do lỗi kết nối AI.");
-      setShowToast(true);
-    } finally {
-      setGeneratingWeekly(false);
-    }
-  };
-
-  const generateMockWeekly = () => {
-    const days = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
-    return days.map(d => ({
-      day: d,
-      activities: [
-        { title: "Giao tiếp mắt & Chào hỏi", description: "Bé nhìn vào mắt và vẫy tay khi được gọi tên.", domain: "Giao tiếp", requiresModeling: true },
-        { title: "Vận động tinh: Gắp hạt", description: "Bé dùng kẹp gắp hạt đậu từ bát này sang bát kia.", domain: "Vận động", requiresModeling: false },
-        { title: "Tự phục vụ: Cất dọn đồ chơi", description: "Bé tự tay cất đồ chơi vào thùng sau khi chơi xong.", domain: "Tự phục vụ", requiresModeling: true },
-      ]
-    }));
-  };
-
-  const handleDeleteVideo = async (vidId: string, createdAt: any) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa video này?")) return;
-    try {
-      const success = await videoService.deleteVideo(vidId, createdAt);
-      if (success) {
-        setVideoModelingSessions(prev => prev.filter(v => v.id !== vidId));
-      } else {
-        alert("Đã hết thời gian (1 giờ) để xóa video này.");
-      }
-    } catch (e) {
-      console.error("Xóa thất bại:", e);
-    }
-  };
-
-  useEffect(() => {
-    if (!userProfile?.childId) return;
-    
-    const unsubscribe = subscribeToTasks(userProfile.childId, (newTasks) => {
-      if (newTasks.length > prevTaskCount && prevTaskCount > 0) {
-        setToastMessage(newTasks[newTasks.length - 1].content);
-        setShowToast(true);
-        setTimeout(() => setShowToast(false), 5000);
-      }
-      setPrevTaskCount(newTasks.length);
-      setTasks(newTasks);
-    });
-
-    return () => unsubscribe();
-  }, [userProfile, prevTaskCount]);
-
-  const handleAcknowledge = async (taskId: string) => {
-    await acknowledgeTask(taskId);
-  };
-
-  const startUpload = (topic: string) => {
-    setActiveUploadTopic(topic);
-    setIsUploadOpen(true);
+    return 0;
   };
 
   return (
-    <div className="flex flex-col bg-calming-bg min-h-screen pb-32">
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ y: -80, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -80, opacity: 0 }}
-            className="fixed top-6 left-4 right-4 z-[100] bg-amber-500 text-white rounded-[24px] p-5 shadow-2xl flex items-start gap-4"
-          >
-            <div className="p-2 bg-white/20 rounded-xl shrink-0">
-              <MessageCircle size={20} />
-            </div>
-            <div className="flex-1 min-w-0">
-               <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Lời nhắn từ Giáo viên</p>
-               <p className="text-sm font-bold mt-1 leading-snug line-clamp-2">{toastMessage}</p>
-            </div>
-            <button onClick={() => setShowToast(false)} className="shrink-0 opacity-70 hover:opacity-100">
-              <X size={18} />
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <header className="px-4 sm:px-8 py-4 sm:py-8 flex justify-between items-center bg-white/90 backdrop-blur-md sticky top-0 z-40">
-        <UserMenu userName={userProfile?.displayName || "Phụ huynh"} role={userProfile?.role || "parent"} />
-        <div className="relative p-3 bg-white rounded-2xl shadow-sm border border-gray-100">
-          <Bell size={24} className="text-gray-400" />
-          {tasks.length > 0 && (
-            <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
-          )}
+    <div className="flex flex-col bg-[#F8FAFC] min-h-screen pb-32">
+      {/* Header */}
+      <header className="px-6 py-6 flex justify-between items-center bg-white border-b border-slate-100 sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <UserMenu userName={userProfile?.displayName || "Phụ huynh"} role="parent" />
+        </div>
+        <h1 className="text-lg font-bold text-slate-800">Trang chủ Phụ huynh</h1>
+        <div className="relative w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+          <Bell size={20} />
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
         </div>
       </header>
 
-      <main className="px-8 space-y-10 mt-6">
-        <HPDTBrainCard value={userProfile?.hpdt || 75} status="Đang tiến hóa" emotion="Vui vẻ" lastUpdate="Vừa xong" />
-
-        <section className="space-y-5">
-          <div className="flex items-center justify-between gap-4">
-            <h3 className="text-lg font-black text-gray-900 tracking-tight">Bài học can thiệp mới từ hồ sơ Word</h3>
-            {wordInsights ? (
-              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                {formatFirestoreLikeDate(wordInsights.updatedAt)}
-              </span>
-            ) : null}
+      <main className="px-6 pt-8 space-y-10">
+        {/* Profile */}
+        <section className="flex items-center gap-5">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-full border-4 border-white shadow-xl overflow-hidden bg-slate-200">
+              <img
+                src={userProfile?.childAvatar || "https://images.unsplash.com/photo-1502086223501-7ea2443d8447?auto=format&fit=crop&q=80&w=200"}
+                alt="Child"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-white shadow-sm" />
           </div>
-
-          {wordInsights && wordInsights.interventionLessons.length > 0 ? (
-            <div className="space-y-4">
-              <div className="rounded-[28px] border border-primary/15 bg-primary/5 p-5 space-y-2">
-                <p className="text-[10px] uppercase tracking-widest font-black text-primary">Tổng quan từ hồ sơ</p>
-                <p className="text-sm font-bold text-gray-800 leading-relaxed">
-                  {wordInsights.summary || "Hệ thống đã đọc tài liệu Word và tạo danh sách bài can thiệp mới."}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {wordInsights.interventionLessons.slice(0, 4).map((lesson, index) => (
-                  <ActivityItem
-                    key={`${lesson.title}-${index}`}
-                    title={lesson.title}
-                    location={`${lesson.domain} • ${priorityLabel(lesson.priority)}`}
-                    duration="Bài mới từ hồ sơ"
-                    isCompleted={false}
-                    onUpload={() => startUpload(lesson.title)}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white rounded-[28px] p-6 border border-dashed border-gray-200 text-center text-sm text-gray-400 font-semibold">
-              Chưa có bài can thiệp mới từ hồ sơ Word. Sau khi Admin nạp tài liệu, hệ thống sẽ tự động cập nhật tại đây.
-            </div>
-          )}
+          <div className="flex-1">
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Chào ba mẹ!</h2>
+            <p className="text-slate-500 font-medium text-lg mt-0.5">
+              {userProfile?.childName || "Bé"} đang cảm thấy{" "}
+              <span className="text-indigo-600 font-bold">{userProfile?.regulationLevel || "ổn định"}</span>
+            </p>
+            <p className="text-orange-500 font-bold text-sm mt-1 uppercase tracking-wider">{today}</p>
+          </div>
+          <div className="hidden sm:flex flex-col items-end gap-1">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiến độ HPDT</span>
+            <div className="text-3xl font-black text-indigo-600 leading-none">{userProfile?.hpdt || 75}%</div>
+          </div>
         </section>
 
-        {tasks.map((task) => (
-          <motion.div
-            key={task.id}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="bg-amber-50 border-2 border-amber-100 rounded-[40px] p-8 space-y-4 shadow-soft relative overflow-hidden"
-          >
-            <div className="flex items-center gap-3 text-amber-600">
-              <MessageCircle size={18} />
-              <h3 className="text-xs font-black uppercase tracking-widest italic">Lời nhắn từ {task.teacherName}</h3>
+        {/* HPDT Card */}
+        <section className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 flex items-center justify-between gap-6 overflow-hidden relative">
+          <div className="absolute -left-12 -bottom-12 w-48 h-48 bg-indigo-50 rounded-full opacity-50" />
+          <div className="relative z-10 flex items-center gap-6">
+            <div className="w-20 h-20 bg-indigo-600 rounded-[24px] flex items-center justify-center text-white shadow-lg shadow-indigo-100">
+              <Brain size={40} fill="currentColor" />
             </div>
-            <p className="text-lg font-black text-amber-950 tracking-tight italic">"{task.content}"</p>
-            <button
-              onClick={() => task.id && handleAcknowledge(task.id)}
-              className="bg-white text-amber-600 px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm border border-amber-100 flex items-center gap-2"
-            >
-              <CheckCircle2 size={14} /> Đã nhận bài
-            </button>
-          </motion.div>
-        ))}
+            <div>
+              <h3 className="text-2xl font-black text-slate-900 leading-tight">Chỉ số HPDT</h3>
+              <p className="text-slate-500 font-medium">Bé đang tiến hóa tích cực</p>
+            </div>
+          </div>
+          <div className="relative z-10 text-right">
+            <div className="text-5xl font-black text-indigo-600 leading-none tracking-tighter">
+              {userProfile?.hpdt || 75}<span className="text-2xl opacity-50">%</span>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-2">
+              <Zap size={10} fill="currentColor" /> +2.5% tuần này
+            </div>
+          </div>
+        </section>
 
-        {/* Video Modeling Section */}
+        {/* Characteristics Summary */}
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest">Tóm tắt đặc điểm</h3>
+            {videoCount > 0 && (
+              <span className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-full border border-indigo-100">
+                Dựa trên {videoCount} video tuần này
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <motion.div whileHover={{ y: -4 }} className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 space-y-3">
+              <span className="inline-block bg-emerald-50 text-emerald-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">Thế mạnh</span>
+              <h4 className="font-bold text-slate-900 text-lg">{strengths[0]}</h4>
+              <p className="text-slate-500 text-xs leading-relaxed font-medium">{strengthsDesc}</p>
+            </motion.div>
+            <motion.div whileHover={{ y: -4 }} className="bg-white p-5 rounded-[24px] shadow-sm border border-slate-100 space-y-3">
+              <span className="inline-block bg-rose-50 text-rose-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider">Thách thức</span>
+              <h4 className="font-bold text-slate-900 text-lg">{challenges}</h4>
+              <p className="text-slate-500 text-xs leading-relaxed font-medium">{challengesDesc}</p>
+            </motion.div>
+          </div>
+        </section>
+
+        {/* AI Advice */}
+        <section className="bg-orange-50 rounded-[32px] p-8 space-y-6 relative overflow-hidden group">
+          <div className="absolute -right-6 -top-6 w-32 h-32 bg-orange-100 rounded-full opacity-50 transition-transform group-hover:scale-110" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-200">
+              <Brain size={24} fill="currentColor" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900">Lời khuyên từ AI</h3>
+          </div>
+          <p className="text-slate-700 font-medium leading-relaxed text-lg relative z-10">{aiAdvice}</p>
+          <button
+            onClick={() => router.push("/parent/library")}
+            className="flex items-center gap-2 text-orange-600 font-bold text-sm group/btn relative z-10"
+          >
+            Xem chi tiết phân tích <ArrowRight size={16} className="transition-transform group-hover/btn:translate-x-1" />
+          </button>
+        </section>
+
+        {/* Suggested Goals */}
         <section className="space-y-6">
-          <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
-            <span className="text-red-500"><Video size={24} /></span> Video Modeling
-          </h3>
-
-          <div className="flex gap-5 overflow-x-auto no-scrollbar pb-2 min-h-[200px]">
-            {loadingVideos ? (
-              <div className="flex items-center justify-center w-full py-10"><Loader2 className="animate-spin text-primary" size={32} /></div>
-            ) : videoModelingSessions.length === 0 ? (
-              <div className="text-center w-full py-10 text-gray-400 font-medium">Chưa có video modeling nào được chia sẻ.</div>
-            ) : (
-              videoModelingSessions.map((video, idx) => (
-                <motion.div
-                  key={idx}
-                  whileHover={{ y: -4 }}
-                  className="min-w-[300px] bg-white rounded-[32px] shadow-premium border border-gray-100 overflow-hidden relative"
-                >
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDeleteVideo(video.id, video.createdAt); }}
-                    className="absolute top-4 right-4 z-20 p-2 bg-white/80 backdrop-blur-sm text-gray-400 hover:text-red-500 rounded-xl border border-gray-100 shadow-sm transition-colors"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-
-                  <div className="relative aspect-video bg-gray-100 flex items-center justify-center group cursor-pointer"
-                       onClick={() => openVideoReplay(video)}>
-                    <img 
-                      src={video.thumbnail} 
-                      alt={video.title} 
-                      className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                      onError={(e) => { (e.target as any).src = 'https://images.unsplash.com/photo-1620070088567-cc7601662b24?auto=format&fit=crop&q=80&w=400'; }}
-                    />
-                    <div className="absolute top-4 left-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-xl text-[10px] text-white font-bold uppercase tracking-wider">
-                      {video.location}
-                    </div>
-                    <motion.div
-                      whileHover={{ scale: 1.1 }}
-                      className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center relative z-10"
-                    >
-                      <Play size={32} className="text-white fill-white ml-1" />
-                    </motion.div>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <Target size={16} className="text-orange-500" /> Mục tiêu phát triển gợi ý (AI)
+            </h3>
+            <button className="text-orange-500 font-bold text-sm">Làm mới</button>
+          </div>
+          <div className="space-y-4">
+            {goals.map((goal: any, idx: number) => (
+              <div key={idx} className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-50 flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-300">
+                  <Compass size={24} />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-bold text-slate-900 leading-tight pr-4">{goal.focus}</h4>
+                    <span className="shrink-0 bg-orange-50 text-orange-600 text-[10px] font-black px-3 py-1 rounded-full">
+                      {goal.domain || "XÃ HỘI"}
+                    </span>
                   </div>
-                  <div className="p-6 space-y-4">
-                    <h4 className="font-extrabold text-gray-900 text-lg line-clamp-1">{video.title}</h4>
-                    <div className="flex justify-between items-center">
-                      <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">AI: {video.accuracy}%</span>
-                      <span className="text-[10px] text-gray-400 font-bold tracking-widest">{video.time}</span>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                    <Clock size={10} /> {goal.period || "Tháng này"}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Video Modeling ─────────────────────────────────────────── */}
+        <section className="space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-black text-slate-800 flex items-center gap-2">
+              <Camera className="text-rose-500" size={22} /> Video Modeling
+            </h3>
+            <div className="flex items-center gap-2">
+              {videos.length > 0 && (
+                <button
+                  onClick={() => router.push("/parent/library")}
+                  className="text-indigo-600 font-bold text-sm"
+                >
+                  Xem tất cả
+                </button>
+              )}
+              <button
+                onClick={() => setIsUploadOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 bg-rose-500 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-sm hover:bg-rose-600 transition-all active:scale-95"
+              >
+                <Plus size={14} strokeWidth={3} /> Upload
+              </button>
+            </div>
+          </div>
+
+          <div className="flex gap-5 overflow-x-auto pb-4 -mx-6 px-6 no-scrollbar snap-x">
+            {videos.length > 0 ? videos.map((video: any, idx: number) => {
+              const progress = getAnalysisProgress(video);
+              const createdAt = video.createdAt?.toDate?.() || new Date();
+              const timeStr = createdAt.toLocaleTimeString("vi-VN", { hour12: false, hour: "2-digit", minute: "2-digit" });
+              const dateStr = createdAt.toLocaleDateString("vi-VN");
+              const isAnalyzed = progress === 100;
+
+              return (
+                <motion.div
+                  key={video.id || idx}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="min-w-[280px] bg-white rounded-[28px] overflow-hidden border border-slate-100 shadow-sm snap-start group cursor-pointer flex-shrink-0"
+                  onClick={() => {
+                    if (isAnalyzed) {
+                      setViewingVideo({ url: video.videoUrl || video.url || "", title: video.topic || `Video ${idx + 1}` });
+                    } else {
+                      router.push(`/parent/analyze?id=${video.id}`);
+                    }
+                  }}
+                >
+                  {/* Thumbnail */}
+                  <div className="relative h-44 bg-slate-900">
+                    <img
+                      src={video.thumbnail || "https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&q=80&w=400"}
+                      className="w-full h-full object-cover opacity-80"
+                      alt="Thumbnail"
+                    />
+                    <div className="absolute inset-0 p-3 flex flex-col justify-between">
+                      <div className="flex justify-between items-start">
+                        <span className="bg-black/40 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest">
+                          {video.context === "home" ? "Tại nhà" : (video.context || "Lớp học")}
+                        </span>
+                        <button
+                          onClick={(e) => handleDeleteVideo(video.id, e)}
+                          className="w-7 h-7 bg-white/90 backdrop-blur rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500 hover:bg-white transition-all shadow-sm"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                      <div className="flex justify-center items-center">
+                        <div className="w-11 h-11 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 text-white group-hover:scale-110 transition-transform">
+                          <Play fill="white" size={20} className="ml-0.5" />
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress}%` }}
+                          className={`h-full rounded-full ${isAnalyzed ? "bg-emerald-400" : "bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.5)]"}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Info */}
+                  <div className="p-4 space-y-3">
+                    <h4 className="font-bold text-slate-900 text-sm line-clamp-1">
+                      {video.topic || video.fileName || `Video ${idx + 1}`}
+                    </h4>
+                    <div className="flex items-center justify-between">
+                      <div className={`px-2.5 py-1 rounded-full text-[10px] font-black flex items-center gap-1.5 ${isAnalyzed ? "bg-emerald-50 text-emerald-600" : "bg-indigo-50 text-indigo-600"}`}>
+                        <div className={`w-1.5 h-1.5 rounded-full ${isAnalyzed ? "bg-emerald-500" : "bg-indigo-500 animate-pulse"}`} />
+                        {isAnalyzed ? "Đã phân tích" : `AI: ${progress}%`}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-bold tabular-nums">{timeStr} · {dateStr}</span>
                     </div>
                   </div>
                 </motion.div>
-              ))
+              );
+            }) : (
+              /* Empty state */
+              <div className="w-full min-w-[calc(100vw-3rem)] py-14 flex flex-col items-center justify-center bg-white rounded-[32px] border-2 border-dashed border-slate-200">
+                <div className="w-20 h-20 rounded-[28px] bg-rose-50 flex items-center justify-center mb-4">
+                  <Camera size={36} className="text-rose-200" />
+                </div>
+                <p className="text-sm font-black text-slate-400 uppercase tracking-widest mb-1">Chưa có video nào</p>
+                <p className="text-xs text-slate-300 font-medium mb-6 text-center">Ba mẹ hãy quay video bé để AI phân tích hành vi</p>
+                <button
+                  onClick={() => setIsUploadOpen(true)}
+                  className="flex items-center gap-2 px-7 py-3 bg-rose-500 text-white font-black rounded-2xl text-xs uppercase tracking-widest hover:bg-rose-600 transition-all shadow-sm active:scale-95"
+                >
+                  <Camera size={14} /> Tải lên video đầu tiên
+                </button>
+              </div>
             )}
           </div>
         </section>
 
-        {/* Lộ trình tuần này */}
-        <section className="space-y-8 pb-10">
-          <div className="flex justify-between items-end">
-            <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
-              <span className="text-yellow-500"><Zap size={24} fill="currentColor" /></span> Lộ trình tuần này
-            </h3>
-            <button 
-              onClick={handleGenerateWeeklyAI}
-              disabled={generatingWeekly}
-              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 px-4 py-2 rounded-xl transition-all"
-            >
-              {generatingWeekly ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-              Làm mới cả tuần
-            </button>
+        {/* Intervention Plan */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white">
+                <Target size={18} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Kế hoạch can thiệp</h3>
+              <span className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-2 py-1 rounded-full border border-indigo-100">
+                {activities.length} bài học
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {["ABA", "OT", "DIR/Floortime"].map(t => (
+                <span key={t} className="text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-lg uppercase">{t}</span>
+              ))}
+            </div>
           </div>
-          
-          <div className="space-y-12">
-            {loadingSchedule ? (
-               <div className="py-10 flex justify-center"><Loader2 className="animate-spin text-primary" size={24} /></div>
-            ) : weeklySchedule.length > 0 ? (
-              weeklySchedule.map((day, dIdx) => {
-                const daysMap = ["Chủ nhật", "Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7"];
-                const isToday = day.day === daysMap[new Date().getDay()];
-                
-                return (
-                  <div key={dIdx} className={`space-y-6 ${isToday ? 'bg-primary/5 -mx-4 sm:mx-0 px-4 sm:px-8 py-8 rounded-[32px] sm:rounded-[40px] border border-primary/10 shadow-sm ring-4 ring-primary/5' : ''}`}>
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-2xl flex flex-col items-center justify-center font-black ${isToday ? 'bg-primary text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-100 shadow-sm'}`}>
-                        <span className="text-[8px] uppercase tracking-tighter opacity-70">Thứ</span>
-                        <span className="text-lg leading-none">{day.day.split(" ")[1] || "?"}</span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className={`text-lg font-black tracking-tight ${isToday ? 'text-primary' : 'text-gray-900'}`}>
-                            {day.day}
-                          </h4>
-                          {isToday && <span className="bg-primary text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-full">Hôm nay</span>}
-                        </div>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest italic">3 bài tập can thiệp AI</p>
-                      </div>
-                    </div>
 
-                    <div className="space-y-0 relative pl-4 border-l-2 border-dashed border-gray-100 ml-6">
-                      {day.activities.map((item: any, idx: number) => (
-                        <div key={idx} className="relative pb-8 last:pb-0">
-                          {/* Timeline Dot */}
-                          <div className={`absolute -left-[25px] top-6 w-4 h-4 rounded-full border-4 border-white shadow-sm z-10 ${isToday ? 'bg-primary' : 'bg-gray-200'}`} />
-                          
-                          <div className="space-y-2">
-                             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-300 pl-2">
-                                {idx === 0 ? "Buổi Sáng" : idx === 1 ? "Buổi Trưa" : "Buổi Chiều"}
-                             </span>
-                             <ActivityItem 
-                                title={item.title} 
-                                location={item.requiresModeling ? "Yêu cầu Video" : "Xem giáo án"} 
-                                duration={item.domain} 
-                                isCompleted={false}
-                                onUpload={item.requiresModeling ? () => startUpload(item.title) : undefined}
-                              />
-                          </div>
+          <div className="space-y-6">
+            {activities.map((act: any, idx: number) => {
+              const exerciseId = act.title || `ex-${idx}`;
+              const isExpanded = expandedExercises.includes(exerciseId);
+              const steps = act.steps || [
+                "Quan sát và tham gia theo sự dẫn dắt của trẻ",
+                "Mở rộng vòng tròn giao tiếp",
+                "Tạo cơ hội cho bé khởi xướng",
+              ];
+              const completedCount = steps.filter((s: string) => completedTasks.includes(`${exerciseId}-${s}`)).length;
+
+              return (
+                <motion.div key={exerciseId} layout className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+                  <div onClick={() => toggleExpand(exerciseId)} className="p-8 cursor-pointer hover:bg-slate-50 transition-all">
+                    <div className="flex items-start justify-between gap-6">
+                      <div className="flex items-start gap-6 flex-1">
+                        <div className="w-12 h-12 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xl font-black shadow-lg shadow-indigo-100 shrink-0">
+                          {idx + 1}
                         </div>
-                      ))}
+                        <div className="space-y-3 flex-1">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-xl font-black text-slate-900 leading-tight">
+                              {act.title || "Tăng cường Tương tác"}
+                            </h4>
+                            <div className="flex items-center gap-2">
+                              <span className="text-slate-400 font-black text-sm">{completedCount}/{steps.length}</span>
+                              <ChevronRight size={20} className={`text-slate-300 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <span className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-lg uppercase">
+                              {act.category || act.domain || "Social Skill"}
+                            </span>
+                            <span className={`text-[10px] font-black px-3 py-1 rounded-lg uppercase ${
+                              idx % 3 === 0 ? "bg-orange-50 text-orange-600" :
+                              idx % 3 === 1 ? "bg-indigo-50 text-indigo-600" : "bg-rose-50 text-rose-600"
+                            }`}>
+                              {idx % 3 === 0 ? "Cả hai" : idx % 3 === 1 ? "Giáo viên" : "Phụ huynh"}
+                            </span>
+                          </div>
+                          <p className="text-slate-500 font-medium leading-relaxed">
+                            {act.objective || act.focus || "Nhấn để xem các bước thực hiện chi tiết."}
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                );
-              })
-            ) : (
-              <div className="bg-white rounded-[40px] p-10 text-center border-2 border-dashed border-gray-100 space-y-6">
-                 <div className="w-16 h-16 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto">
-                    <Calendar size={32} className="text-gray-200" />
-                 </div>
-                 <div className="space-y-2">
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest leading-none">Chưa có lịch dạy tuần này</p>
-                    <p className="text-[10px] text-gray-300 font-medium italic">Bạn có muốn AI cá nhân hóa lộ trình 7 ngày cho bé không?</p>
-                 </div>
-                 <button 
-                    onClick={handleGenerateWeeklyAI}
-                    disabled={generatingWeekly}
-                    className="bg-primary text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 mx-auto"
-                 >
-                    {generatingWeekly ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} fill="currentColor" />}
-                    Tạo lộ trình tuần này (AI)
-                 </button>
-              </div>
-            )}
+
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="border-t border-slate-50"
+                      >
+                        <div className="p-8 bg-slate-50/50 space-y-8">
+                          <div className="flex items-center gap-2 text-indigo-600">
+                            <Sparkles size={16} />
+                            <h5 className="text-xs font-black uppercase tracking-widest">Các bước thực hiện</h5>
+                          </div>
+                          <div className="space-y-10">
+                            {steps.map((step: string, sIdx: number) => {
+                              const stepId = `${exerciseId}-${step}`;
+                              const isStepDone = completedTasks.includes(stepId);
+                              const isSaving = savingStep === stepId;
+                              return (
+                                <div key={sIdx} className="flex gap-6 group">
+                                  <button
+                                    onClick={() => saveStepProgress(stepId, !isStepDone)}
+                                    disabled={isSaving}
+                                    className={`w-10 h-10 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
+                                      isStepDone ? "bg-emerald-500 border-emerald-500 text-white" : "bg-indigo-50 border-indigo-100 text-indigo-400 group-hover:border-indigo-300"
+                                    } ${isSaving ? "animate-pulse" : ""}`}
+                                  >
+                                    {isSaving ? <Loader2 className="animate-spin" size={16} /> :
+                                     isStepDone ? <CheckCircle2 size={20} /> : <span className="text-sm font-black">{sIdx + 1}</span>}
+                                  </button>
+                                  <div className="space-y-4 flex-1">
+                                    <div className="space-y-2">
+                                      <h6 className={`text-lg font-bold leading-tight transition-colors ${isStepDone ? "text-slate-400 line-through" : "text-slate-900"}`}>
+                                        {step}
+                                      </h6>
+                                      {!isStepDone && (
+                                        <div className="space-y-2">
+                                          <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                                            Cho phép bé lựa chọn hoạt động chơi tự do. Quan sát hành vi và sự chú ý của trẻ.
+                                          </p>
+                                          <p className="text-xs font-bold text-indigo-500 leading-relaxed italic">
+                                            HD: Ngồi gần bé, bắt chước hành động chơi của trẻ.
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="relative group/note">
+                                      <textarea
+                                        value={taskNotes[stepId] || ""}
+                                        onChange={(e) => setTaskNotes(prev => ({ ...prev, [stepId]: e.target.value }))}
+                                        placeholder="Ghi chú kết quả cho bước này..."
+                                        className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-3 text-xs font-medium focus:ring-2 focus:ring-indigo-100 transition-all min-h-[60px] resize-none"
+                                      />
+                                      <button
+                                        onClick={() => saveStepProgress(stepId, isStepDone)}
+                                        disabled={isSaving}
+                                        className="absolute right-3 bottom-3 p-2 bg-indigo-50 text-indigo-600 rounded-lg opacity-0 group-hover/note:opacity-100 transition-opacity hover:bg-indigo-600 hover:text-white"
+                                      >
+                                        {isSaving ? <Loader2 className="animate-spin" size={14} /> : <Save size={14} />}
+                                      </button>
+                                    </div>
+                                    {!isStepDone && (
+                                      <p className="text-xs font-bold text-emerald-500 leading-relaxed">
+                                        Mục tiêu: Bé phản hồi bằng cách nhìn, cười, hoặc tiếp tục chơi.
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              );
+            })}
           </div>
         </section>
       </main>
 
-      {/* Floating Upload Button */}
-      <button
-        onClick={() => startUpload("Hoạt động tự phát")}
-        className="fixed bottom-28 right-8 w-16 h-16 bg-primary text-white rounded-[24px] shadow-hpdt flex items-center justify-center active:scale-110 transition-all z-40"
+      {/* FAB */}
+      <motion.button
+        whileHover={{ scale: 1.1, rotate: 5 }}
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setIsUploadOpen(true)}
+        className="fixed bottom-8 right-8 w-16 h-16 bg-[#5851DB] text-white rounded-2xl shadow-2xl shadow-indigo-200 flex items-center justify-center active:scale-110 transition-all z-50 group overflow-hidden border-4 border-white/20"
       >
-        <Camera size={32} fill="currentColor" />
-      </button>
+        <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <Camera size={28} strokeWidth={2.5} />
+      </motion.button>
 
-      <VideoUploadModal 
-        isOpen={isUploadOpen} 
-        onClose={() => setIsUploadOpen(false)} 
-        role="parent" 
+      <VideoUploadModal
+        isOpen={isUploadOpen}
+        onClose={() => setIsUploadOpen(false)}
+        role="parent"
         childId={userProfile?.childId}
-        initialTopic={activeUploadTopic}
       />
+
+      {/* Video viewer modal */}
+      <AnimatePresence>
+        {viewingVideo && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black/90 flex flex-col"
+            onClick={() => setViewingVideo(null)}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 flex-shrink-0" onClick={e => e.stopPropagation()}>
+              <p className="text-white font-bold text-sm truncate pr-4">{viewingVideo.title}</p>
+              <button
+                onClick={() => setViewingVideo(null)}
+                className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors flex-shrink-0"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Video */}
+            <div className="flex-1 flex items-center justify-center px-4 pb-8" onClick={e => e.stopPropagation()}>
+              {viewingVideo.url ? (
+                <video
+                  src={viewingVideo.url}
+                  controls
+                  autoPlay
+                  playsInline
+                  className="w-full max-h-full rounded-2xl"
+                  style={{ maxHeight: "calc(100vh - 100px)" }}
+                />
+              ) : (
+                <div className="text-white/50 text-sm font-bold">Không tải được video.</div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
