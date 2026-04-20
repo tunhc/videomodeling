@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 import type { ReportContent, ReportExercise, ReportMonthlyPlan } from "@/lib/claude";
 
 export const runtime = "nodejs";
@@ -73,9 +74,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const db = getAdminDb();
-    const snap = await db.collection("video_analysis").doc(analysisId).get();
-    if (!snap.exists) {
+    const snap = await getDoc(doc(db, "video_analysis", analysisId));
+    if (!snap.exists()) {
       return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
     }
 
@@ -86,8 +86,8 @@ export async function GET(request: NextRequest) {
 
     // Fetch child + video metadata in parallel
     const [childSnap, videoSnap] = await Promise.all([
-      db.collection("children").doc(childId).get(),
-      db.collection("video_modeling").doc(videoId).get(),
+      getDoc(doc(db, "children", childId)),
+      getDoc(doc(db, "video_modeling", videoId)),
     ]);
 
     const child = childSnap.data() ?? {};
