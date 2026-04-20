@@ -83,6 +83,9 @@ export async function GET(request: NextRequest) {
     const report = data.reportContent as ReportContent | undefined;
     const childId = data.childId as string;
     const videoId = data.videoId as string;
+    const summary = data.summary ?? {};
+    const plan    = data.interventionPlan ?? {};
+    const frame   = data.frameAnalysis ?? {};
 
     // Fetch child + video metadata in parallel
     const [childSnap, videoSnap] = await Promise.all([
@@ -94,21 +97,79 @@ export async function GET(request: NextRequest) {
     const video = videoSnap.data() ?? {};
     const childName = (child.name as string | undefined) ?? childId;
 
-    const recordDate  = data.createdAt?.toDate
-      ? (data.createdAt.toDate() as Date).toLocaleDateString("vi-VN")
-      : new Date(data.createdAt).toLocaleDateString("vi-VN");
-    const context    = (video.context ?? video.location ?? "Không rõ") as string;
-    const duration   = video.duration ? `~${video.duration} giây` : "Không rõ";
-    const publicId   = (video.publicId ?? videoId) as string;
+    const recordDate = (() => {
+      try {
+        const ts = data.createdAt;
+        if (ts && typeof ts.toDate === "function") return ts.toDate().toLocaleDateString("vi-VN");
+        if (ts) return new Date(ts).toLocaleDateString("vi-VN");
+      } catch {}
+      return new Date().toLocaleDateString("vi-VN");
+    })();
+    const context  = (video.context ?? video.location ?? "Không rõ") as string;
+    const duration = video.duration ? `~${video.duration} giây` : "Không rõ";
+    const publicId = (video.publicId ?? videoId) as string;
 
-    // Observation rows
-    const obsRows = (report?.videoObservations ?? [])
-      .map((row) => `
+    // ── Section I content ──────────────────────────────────────────────────────
+    // Prefer reportContent.videoObservations, else build from frameAnalysis tags + summary
+    const obsRows = (() => {
+      if (report?.videoObservations?.length) {
+        return report.videoObservations
+          .map((row: any) => `
+            <tr>
+              <td style="padding:8px 12px;font-size:12px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;width:180px;white-space:nowrap;">${escHtml(row.label)}</td>
+              <td style="padding:8px 12px;font-size:12px;color:#374151;border:1px solid #e2e8f0;">${escHtml(row.value)}</td>
+            </tr>`)
+          .join("");
+      }
+      // Fallback from frameAnalysis
+      const rows: { label: string; value: string }[] = [];
+      if (summary.dominantBehavior) rows.push({ label: "Hành vi nổi bật", value: summary.dominantBehavior });
+      if (summary.regulationLevel)  rows.push({ label: "Mức điều hòa",    value: summary.regulationLevel === "regulated" ? "Điều hòa tốt" : summary.regulationLevel === "transitioning" ? "Đang chuyển tiếp" : "Mất điều hòa" });
+      if ((frame.tags ?? []).length) rows.push({ label: "Nhãn hành vi",   value: (frame.tags as string[]).join(", ") });
+      if (frame.hpdt?.overall)       rows.push({ label: "Điểm HPDT",      value: `${frame.hpdt.overall}/100` });
+      return rows.map((r) => `
         <tr>
-          <td style="padding:8px 12px;font-size:12px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;width:180px;white-space:nowrap;">${escHtml(row.label)}</td>
-          <td style="padding:8px 12px;font-size:12px;color:#374151;border:1px solid #e2e8f0;">${escHtml(row.value)}</td>
-        </tr>`)
-      .join("");
+          <td style="padding:8px 12px;font-size:12px;font-weight:700;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;width:180px;white-space:nowrap;">${escHtml(r.label)}</td>
+          <td style="padding:8px 12px;font-size:12px;color:#374151;border:1px solid #e2e8f0;">${escHtml(r.value)}</td>
+        </tr>`).join("");
+    })();
+
+    const behaviourText = report?.behaviourAnalysis
+      || [summary.overallRecommendation, ...(summary.keyInsights ?? [])].filter(Boolean).join("\n\n")
+      || "";
+
+    // ── Section II content ─────────────────────────────────────────────────────
+    const strategyText = report?.interventionStrategy
+      || ((plan.approach ?? []) as string[]).join(" · ")
+      || "";
+
+    // Exercises: prefer reportContent, else build simple cards from lessons
+    const exerciseBlocks = (() => {
+      if (report?.exercises?.length) return (report.exercises as ReportExercise[]).map(exerciseHtml).join("");
+      const lessons: any[] = plan.lessons ?? [];
+      if (!lessons.length) return `<p class="section-text" style="color:#94a3b8;">Chưa có bài tập — vui lòng mở lại trang phân tích và nhấn "Lưu kết quả".</p>`;
+      return lessons.map((l: any, idx: number) => {
+        const steps = (l.steps ?? []).map((s: any, i: number) =>
+          `<li style="margin-bottom:6px;">${escHtml(String(s.description ?? s.title ?? s))}</li>`
+        ).join("");
+        const approach = (l.lessonType ?? l.vmType ?? "").replace(/_/g, " ").toUpperCase();
+        const badge = approach ? therapyBadge(approach) : "";
+        return `
+  <div style="margin-bottom:24px;border:1px solid #e2e8f0;border-left:4px solid #1d4ed8;border-radius:0 12px 12px 0;padding:0;overflow:hidden;page-break-inside:avoid;">
+    <div style="background:#f0f7ff;padding:14px 18px 10px;">
+      <div style="font-size:14px;font-weight:800;color:#1e3a5f;margin-bottom:4px;">Bài ${idx + 1} &nbsp; ${escHtml(l.title ?? "Bài học")}</div>
+      ${l.rationale ? `<div style="font-size:11px;color:#64748b;font-style:italic;margin-bottom:6px;">${escHtml(l.rationale)}</div>` : ""}
+      <div>${badge}</div>
+    </div>
+    <div style="padding:14px 18px;">
+      ${l.goals?.length ? `<div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:4px;">Mục tiêu</div><div style="font-size:12px;color:#374151;font-style:italic;margin-bottom:12px;">${escHtml(l.goals[0]?.smartGoal ?? l.goals[0]?.targetBehavior ?? "")}</div>` : ""}
+      ${steps ? `<div style="font-size:11px;font-weight:700;color:#1d4ed8;text-transform:uppercase;margin-bottom:6px;">Các bước</div><ol style="margin:0;padding-left:20px;font-size:12px;color:#374151;line-height:1.7;">${steps}</ol>` : ""}
+    </div>
+  </div>`;
+      }).join("");
+    })();
+
+    const collaborationMsg = plan.collaborationMessage as string | undefined;
 
     const html = `<!DOCTYPE html>
 <html lang="vi">
@@ -118,20 +179,8 @@ export async function GET(request: NextRequest) {
   <title>Báo cáo can thiệp — ${escHtml(childName)}</title>
   <style>
     * { box-sizing: border-box; }
-    body {
-      font-family: "Segoe UI", Arial, sans-serif;
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 32px 40px;
-      color: #1a1a2e;
-      line-height: 1.6;
-      font-size: 13px;
-    }
-    @media print {
-      body { padding: 20px 28px; }
-      .no-print { display: none !important; }
-      a { text-decoration: none; }
-    }
+    body { font-family: "Segoe UI", Arial, sans-serif; max-width: 860px; margin: 0 auto; padding: 32px 40px; color: #1a1a2e; line-height: 1.6; font-size: 13px; }
+    @media print { body { padding: 20px 28px; } .no-print { display: none !important; } a { text-decoration: none; } }
     h1 { font-size: 28px; font-weight: 900; color: #1e3a5f; margin: 0 0 4px; letter-spacing: -0.5px; }
     h2 { font-size: 18px; font-weight: 800; color: #1e3a5f; margin: 28px 0 12px; border-bottom: 2px solid #1d4ed8; padding-bottom: 6px; }
     h3 { font-size: 13px; font-weight: 800; color: #1e3a5f; margin: 16px 0 6px; }
@@ -150,37 +199,19 @@ export async function GET(request: NextRequest) {
 </head>
 <body>
 
-  <!-- Print button (hidden on print) -->
   <button class="print-btn no-print" onclick="window.print()">🖨 In / Lưu PDF</button>
 
-  <!-- Logos row -->
   <div style="display:flex;align-items:center;gap:24px;margin-bottom:20px;">
-    <div style="width:52px;height:52px;background:#1e3a5f;border-radius:12px;display:flex;align-items:center;justify-content:center;">
-      <span style="color:#fff;font-size:16px;font-weight:900;">NBAI</span>
-    </div>
-    <div style="width:52px;height:52px;background:#1d4ed8;border-radius:12px;display:flex;align-items:center;justify-content:center;">
-      <span style="color:#fff;font-size:9px;font-weight:900;text-align:center;line-height:1.2;">AI4<br/>AUTISM</span>
-    </div>
-    <div style="width:52px;height:52px;background:#059669;border-radius:12px;display:flex;align-items:center;justify-content:center;">
-      <span style="color:#fff;font-size:8px;font-weight:900;text-align:center;line-height:1.3;">JOB<br/>FOR<br/>AUTISM</span>
-    </div>
+    <div style="width:52px;height:52px;background:#1e3a5f;border-radius:12px;display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:16px;font-weight:900;">NBAI</span></div>
+    <div style="width:52px;height:52px;background:#1d4ed8;border-radius:12px;display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:9px;font-weight:900;text-align:center;line-height:1.2;">AI4<br/>AUTISM</span></div>
+    <div style="width:52px;height:52px;background:#059669;border-radius:12px;display:flex;align-items:center;justify-content:center;"><span style="color:#fff;font-size:8px;font-weight:900;text-align:center;line-height:1.3;">JOB<br/>FOR<br/>AUTISM</span></div>
   </div>
 
-  <!-- Title -->
   <h1>BÁO CÁO CAN THIỆP ĐA LIỆU PHÁP</h1>
   <p class="subtitle">Trẻ tự kỷ — Can thiệp ${escHtml(context)}</p>
 
-  <!-- Info table -->
   <table class="info-table">
-    <thead>
-      <tr>
-        <th>Họ và tên</th>
-        <th>Ngày phân tích</th>
-        <th>Bối cảnh</th>
-        <th>Thời lượng</th>
-        <th>Mã video</th>
-      </tr>
-    </thead>
+    <thead><tr><th>Họ và tên</th><th>Ngày phân tích</th><th>Bối cảnh</th><th>Thời lượng</th><th>Mã video</th></tr></thead>
     <tbody>
       <tr>
         <td>${escHtml(childName)}</td>
@@ -192,36 +223,28 @@ export async function GET(request: NextRequest) {
     </tbody>
   </table>
 
-  <!-- Section I: Observations -->
   <h2>I. Quan Sát Hành Vi Từ Video</h2>
-  <p class="section-text">Video dài ${escHtml(duration)} ghi lại sinh hoạt của bé tại ${escHtml(context)}. Các hành vi sau đây được ghi nhận:</p>
-  <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
-    <tbody>${obsRows}</tbody>
-  </table>
+  <p class="section-text">Video dài ${escHtml(duration)} ghi lại sinh hoạt của bé tại ${escHtml(context)}.</p>
+  <table style="width:100%;border-collapse:collapse;margin-bottom:20px;"><tbody>${obsRows}</tbody></table>
 
-  <!-- Behaviour analysis -->
-  ${report?.behaviourAnalysis ? `<h3>Phân tích hành vi</h3><p class="section-text">${escHtml(report.behaviourAnalysis).replace(/\n/g, "<br/>")}</p>` : ""}
+  ${behaviourText ? `<h3>Phân tích hành vi</h3><p class="section-text">${escHtml(behaviourText).replace(/\n/g, "<br/>")}</p>` : ""}
 
-  <!-- Section II: Intervention -->
   <h2>II. Chiến Lược & Bài Tập Can Thiệp Đa Liệu Pháp</h2>
 
-  ${report?.interventionStrategy ? `
+  ${strategyText ? `
   <h3>Chiến lược can thiệp</h3>
-  <div class="strategy-box">
-    <p style="margin:0;font-size:12px;color:#1e3a5f;">${escHtml(report.interventionStrategy).replace(/\n/g, "<br/>")}</p>
-  </div>` : ""}
+  <div class="strategy-box"><p style="margin:0;font-size:12px;color:#1e3a5f;">${escHtml(strategyText).replace(/\n/g, "<br/>")}</p></div>` : ""}
 
-  ${report?.monthlyPlan?.length ? `
-  <h3>Kế hoạch 1 tháng</h3>
-  ${monthlyPlanHtml(report.monthlyPlan)}
-  <div style="margin-bottom:24px;"></div>` : ""}
+  ${report?.monthlyPlan?.length ? `<h3>Kế hoạch 1 tháng</h3>${monthlyPlanHtml(report.monthlyPlan)}<div style="margin-bottom:24px;"></div>` : ""}
 
   <h3>Bài tập cụ thể</h3>
-  <p class="section-text" style="margin-bottom:16px;">Mỗi bài tập được thiết kế dựa trên hành vi quan sát thực tế, kết hợp đa liệu pháp để tối ưu hóa hiệu quả can thiệp tại nhà.</p>
-  ${(report?.exercises ?? []).map(exerciseHtml).join("")}
+  ${exerciseBlocks}
 
-  <!-- Clinical note -->
-  ${report?.clinicalNote ? `
+  ${collaborationMsg ? `
+  <div class="clinical-note">
+    <strong style="font-size:12px;">Lời nhắn giáo viên</strong><br/>
+    ${escHtml(collaborationMsg)}
+  </div>` : report?.clinicalNote ? `
   <div class="clinical-note">
     <strong style="font-size:12px;">Lưu ý lâm sàng</strong><br/>
     ${escHtml(report.clinicalNote)}
