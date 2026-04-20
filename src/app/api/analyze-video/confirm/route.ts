@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminDb } from "@/lib/firebase-admin";
+import { db } from "@/lib/firebase";
+import {
+  collection, query, where, getDocs, doc, getDoc,
+  setDoc, updateDoc, addDoc, limit,
+} from "firebase/firestore";
 
 export const runtime = "nodejs";
 
@@ -11,26 +15,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "analysisId, videoId and childId are required" }, { status: 400 });
     }
 
-    const db = getAdminDb();
     const now = new Date();
 
-    // 1. Fetch the analysis data
-    const analysisSnap = await db.collection("video_analysis").doc(analysisId).get();
-    if (!analysisSnap.exists) {
+    // 1. Fetch analysis data
+    const analysisSnap = await getDoc(doc(db, "video_analysis", analysisId));
+    if (!analysisSnap.exists()) {
       return NextResponse.json({ error: "Analysis not found" }, { status: 404 });
     }
     const analysis = analysisSnap.data()!;
     const { frameAnalysis, summary, interventionPlan } = analysis;
 
-    // 2. Fetch child data for parentId/teacherId
-    const childSnap = await db.collection("children").doc(childId).get();
+    // 2. Fetch child data
+    const childSnap = await getDoc(doc(db, "children", childId));
     const child = childSnap.data() || {};
 
     // 3. Save individual lessons
     await Promise.all(
       (interventionPlan.lessons ?? []).map(async (lesson: any, idx: number) => {
         const lessonId = `LS_${childId}_${Date.now()}_${idx}`;
-        await db.collection("lessons").doc(lessonId).set({
+        await setDoc(doc(db, "lessons", lessonId), {
           id: lessonId,
           childId,
           analysisId,
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
     const msg = interventionPlan.collaborationMessage;
     if (msg && child.parentId) {
       taskId = `TASK_${childId}_${Date.now()}`;
-      await db.collection("collaboration_tasks").doc(taskId).set({
+      await setDoc(doc(db, "collaboration_tasks", taskId), {
         id: taskId,
         teacherId: child.teacherId ?? teacherId,
         parentId: child.parentId,
@@ -61,18 +64,20 @@ export async function POST(request: NextRequest) {
         createdAt: now,
         analysisId,
       });
-      await db.collection("video_analysis").doc(analysisId).update({ linkedTaskId: taskId });
+      await updateDoc(doc(db, "video_analysis", analysisId), { linkedTaskId: taskId });
     }
 
-    // 5. Update video_modeling status + mark confirmedAt on analysis record
+    // 5. Update video_modeling status + mark confirmedAt
     await Promise.all([
-      db.collection("video_modeling").doc(videoId).update({ status: "Đã phân tích" }),
-      db.collection("video_analysis").doc(analysisId).update({ confirmedAt: now }),
+      updateDoc(doc(db, "video_modeling", videoId), { status: "Đã phân tích" }),
+      updateDoc(doc(db, "video_analysis", analysisId), { confirmedAt: now }),
     ]);
 
     // 6. Update hpdt_stats
-    const hpdtSnap = await db.collection("hpdt_stats").where("childId", "==", childId).limit(1).get();
-    const hpdtDoc = hpdtSnap.docs[0];
+    const hpdtSnap = await getDocs(
+      query(collection(db, "hpdt_stats"), where("childId", "==", childId), limit(1))
+    );
+    const hpdtDocSnap = hpdtSnap.docs[0];
 
     const newDimensions = {
       communication: frameAnalysis.hpdt.cognitive,
@@ -94,23 +99,23 @@ export async function POST(request: NextRequest) {
       ...analysisSnapshot,
     };
 
-    if (hpdtDoc) {
-      await hpdtDoc.ref.update({
+    if (hpdtDocSnap) {
+      await updateDoc(hpdtDocSnap.ref, {
         overallScore: frameAnalysis.hpdt.overall,
         dimensions: newDimensions,
         latestAnalysis: analysisSnapshot,
         lastUpdate: now,
       });
-      await hpdtDoc.ref.collection("history").add(historyData);
+      await addDoc(collection(db, "hpdt_stats", hpdtDocSnap.id, "history"), historyData);
     } else {
-      const newHpdtRef = await db.collection("hpdt_stats").add({
+      const newHpdtRef = await addDoc(collection(db, "hpdt_stats"), {
         childId,
         overallScore: frameAnalysis.hpdt.overall,
         dimensions: newDimensions,
         latestAnalysis: analysisSnapshot,
         lastUpdate: now,
       });
-      await newHpdtRef.collection("history").add(historyData);
+      await addDoc(collection(db, "hpdt_stats", newHpdtRef.id, "history"), historyData);
     }
 
     return NextResponse.json({ success: true, taskId });

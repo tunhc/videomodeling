@@ -7,15 +7,16 @@ import {
   type VideoAnalysisResult,
   type ReportContent,
 } from "@/lib/claude";
-import { getAdminDb } from "@/lib/firebase-admin";
 import { cloudinaryService } from "@/lib/services/cloudinaryService";
-import { db as clientDb } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import {
+  collection, query, where, getDocs, doc, getDoc, setDoc, limit,
+} from "firebase/firestore";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-// ── GET: fetch existing analysis for a video (uses client SDK — no Admin creds needed) ──
+// ── GET: fetch existing analysis for a video ───────────────────────────────
 export async function GET(request: NextRequest) {
   const videoId = request.nextUrl.searchParams.get("videoId");
   if (!videoId) {
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const snap = await getDocs(
-      query(collection(clientDb, "video_analysis"), where("videoId", "==", videoId))
+      query(collection(db, "video_analysis"), where("videoId", "==", videoId))
     );
 
     if (snap.empty) {
@@ -64,11 +65,8 @@ export async function POST(request: NextRequest) {
       videoId: string;
       childId: string;
       teacherId?: string;
-      /** "parent" | "teacher" — dùng để cá nhân hóa lời khuyên */
       senderRole?: "parent" | "teacher" | "system";
-      /** Trạng thái trẻ do người gửi mô tả, vd: "hưng phấn", "mệt mỏi" */
       childState?: string;
-      /** Ghi chú về nơi quay, vd: "phòng học yên tĩnh, 1-1 với GV" */
       locationNote?: string;
     };
 
@@ -79,15 +77,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getAdminDb();
-
     const [videoSnap, childSnap, hpdtSnap] = await Promise.all([
-      db.collection("video_modeling").doc(videoId).get(),
-      db.collection("children").doc(childId).get(),
-      db.collection("hpdt_stats").where("childId", "==", childId).limit(1).get(),
+      getDoc(doc(db, "video_modeling", videoId)),
+      getDoc(doc(db, "children", childId)),
+      getDocs(query(collection(db, "hpdt_stats"), where("childId", "==", childId), limit(1))),
     ]);
 
-    if (!videoSnap.exists) {
+    if (!videoSnap.exists()) {
       return NextResponse.json({ error: "Video not found" }, { status: 404 });
     }
 
@@ -103,7 +99,6 @@ export async function POST(request: NextRequest) {
     const videoUrl = rawUrl.startsWith("http") ? rawUrl : "";
     console.log("[analyze-video] videoUrl:", videoUrl);
 
-    // Build enriched context — merges caller-supplied inputs with video metadata
     const enrichedContext = {
       childId,
       primaryTag: video.primaryTag,
@@ -146,7 +141,7 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const analysisId = `VA_${childId}_${Date.now()}`;
 
-    await db.collection("video_analysis").doc(analysisId).set({
+    await setDoc(doc(db, "video_analysis", analysisId), {
       id: analysisId,
       videoId,
       childId,
