@@ -245,7 +245,7 @@ export default function ParentHome() {
         </div>
         <h1 className="text-base sm:text-lg font-bold text-slate-800">Trang chủ Phụ huynh</h1>
         <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
-          <Bell size={18} sm:size={20} />
+          <Bell size={20} />
           <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
         </div>
       </header>
