@@ -133,18 +133,18 @@ export default function InterventionHub() {
   }
 
   return (
-    <div className="p-8 space-y-10 bg-calming-bg min-h-screen pb-40">
-      <header className="flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-40 py-4 -mx-8 px-8 border-b border-white/50">
+    <div className="p-4 sm:p-8 space-y-6 sm:space-y-10 bg-calming-bg min-h-screen pb-40">
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/50 backdrop-blur-md sticky top-0 z-40 py-4 -mx-4 sm:-mx-8 px-4 sm:px-8 border-b border-white/50 gap-4">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Combo Can Thiệp Tuần</h1>
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5 italic">
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Combo Can Thiệp Tuần</h1>
+          <p className="text-[9px] sm:text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5 italic">
             AI-Driven Strategy • ABA/VB Methodology
           </p>
         </div>
         <button 
           onClick={() => selectedChild && loadChildCombo(selectedChild.id, true)}
           disabled={fetchingCombo}
-          className="flex items-center gap-2 bg-white text-primary px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-primary/10 shadow-sm hover:bg-primary/5 transition-all"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-white text-primary px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-primary/10 shadow-sm hover:bg-primary/5 transition-all"
         >
           {fetchingCombo ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           Làm mới lộ trình (AI)
@@ -200,7 +200,7 @@ export default function InterventionHub() {
           <motion.div 
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="bg-primary rounded-[40px] p-10 text-white shadow-hpdt relative overflow-hidden"
+            className="bg-primary rounded-[32px] sm:rounded-[40px] p-6 sm:p-10 text-white shadow-hpdt relative overflow-hidden"
           >
             <div className="absolute top-[-20px] right-[-20px] opacity-10 pointer-events-none">
               <Star size={160} />
@@ -213,7 +213,7 @@ export default function InterventionHub() {
                      </div>
                      <span className="text-[10px] font-black uppercase tracking-widest text-white/80">Mục tiêu trọng tâm cho {selectedChild?.name}</span>
                   </div>
-                  <h2 className="text-4xl font-black tracking-tighter leading-tight italic">
+                  <h2 className="text-2xl sm:text-4xl font-black tracking-tighter leading-tight italic">
                     "Tập trung vào miền <span className="underline decoration-yellow-400 decoration-4 underline-offset-8">Giao tiếp sớm</span> theo chuẩn VB-MAPP trong tuần này."
                   </h2>
                </div>
@@ -254,7 +254,7 @@ export default function InterventionHub() {
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: idx * 0.1 }}
-                    className="bg-white rounded-[40px] p-8 border border-gray-50 shadow-soft hover:shadow-premium transition-all group flex flex-col"
+                    className="bg-white rounded-[32px] sm:rounded-[40px] p-6 sm:p-8 border border-gray-50 shadow-soft hover:shadow-premium transition-all group flex flex-col"
                    >
                      <div className="flex justify-between items-start mb-6">
                         <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${categoryColors[activity.category] || "bg-gray-50 text-gray-500"}`}>

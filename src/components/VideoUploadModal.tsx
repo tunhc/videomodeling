@@ -299,20 +299,20 @@ export default function VideoUploadModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <motion.div 
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
-        className="bg-white w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] p-10 space-y-8 shadow-2xl overflow-hidden relative"
+        className="bg-white w-full max-w-lg rounded-t-[40px] sm:rounded-[40px] p-6 sm:p-10 space-y-6 sm:space-y-8 shadow-2xl relative max-h-[95vh] sm:max-h-none overflow-y-auto sm:overflow-visible"
       >
-        <button onClick={() => { if(step === 'upload' || step === 'success') onClose(); else handleCancelUpload(); }} className="absolute top-8 right-8 text-gray-400 p-2 hover:bg-gray-50 rounded-full transition-colors">
+        <button onClick={() => { if(step === 'upload' || step === 'success') onClose(); else handleCancelUpload(); }} className="absolute top-6 right-6 sm:top-8 sm:right-8 text-gray-400 p-2 hover:bg-gray-50 rounded-full transition-colors z-50">
           <X size={24} />
         </button>
 
         <AnimatePresence mode="wait">
           {step === "upload" && (
-            <motion.div key="u" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 py-4">
+            <motion.div key="u" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6 sm:space-y-8 py-2 sm:py-4">
               <div className="space-y-2">
                 <h2 className="text-3xl font-black text-gray-900 tracking-tight">Tải Video Lên</h2>
                 <p className="text-sm text-gray-500 font-medium tracking-tight">Lưu trữ hành trình Video Modeling của bé (Cloudinary Storage).</p>
@@ -336,7 +336,7 @@ export default function VideoUploadModal({
               
               <label 
                 htmlFor="video-input"
-                className={`border-4 border-dashed border-indigo-50 bg-indigo-50/20 rounded-[40px] h-72 flex flex-col items-center justify-center gap-6 cursor-pointer hover:bg-indigo-100/50 transition-all group ${isChecking ? 'opacity-50 pointer-events-none' : ''}`}
+                className={`border-4 border-dashed border-indigo-50 bg-indigo-50/20 rounded-[32px] sm:rounded-[40px] h-48 sm:h-72 flex flex-col items-center justify-center gap-4 sm:gap-6 cursor-pointer hover:bg-indigo-100/50 transition-all group ${isChecking ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <input type="file" id="video-input" accept="video/*" hidden onChange={handleFileChange} disabled={isChecking} />
                 <div className="w-20 h-20 bg-primary text-white rounded-3xl flex items-center justify-center shadow-hpdt group-hover:scale-110 transition-transform">
@@ -368,7 +368,7 @@ export default function VideoUploadModal({
           )}
 
           {step === "processing" && (
-            <motion.div key="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center h-96 space-y-10">
+            <motion.div key="p" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center min-h-[300px] sm:h-96 space-y-8 sm:space-y-10">
               <div className="relative">
                 <motion.div 
                   animate={{ rotate: 360 }}
@@ -416,7 +416,7 @@ export default function VideoUploadModal({
           {step === "labeling" && (
             <motion.div key="l" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
               <div className="space-y-2">
-                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Trạng thái của bé?</h2>
+                <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Trạng thái của bé?</h2>
                 <p className="text-sm text-gray-500 font-medium">Bạn cảm thấy bé đang như thế nào trong video?</p>
               </div>
 
@@ -448,7 +448,7 @@ export default function VideoUploadModal({
           {step === "context" && (
             <motion.div key="c" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
               <div className="space-y-2">
-                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Vị trí quay Video?</h2>
+                <h2 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">Vị trí quay Video?</h2>
                 <p className="text-sm text-gray-500 font-medium">Bé đang ở đâu trong video này?</p>
               </div>
               
@@ -462,7 +462,7 @@ export default function VideoUploadModal({
                   <button 
                     key={loc.id}
                     onClick={() => handleLocationSelect(loc.label)}
-                    className="flex flex-col items-center gap-4 p-6 rounded-[32px] border-2 border-gray-100 hover:border-primary hover:bg-primary/5 transition-all group"
+                    className="flex flex-col items-center gap-3 sm:gap-4 p-4 sm:p-6 rounded-[24px] sm:rounded-[32px] border-2 border-gray-100 hover:border-primary hover:bg-primary/5 transition-all group"
                   >
                     <div className="p-3 bg-gray-50 rounded-2xl group-hover:bg-primary group-hover:text-white transition-colors">
                       {loc.icon}

@@ -75,11 +75,11 @@ export default function TeacherHub() {
   };
 
   return (
-    <div className="p-8 space-y-10 bg-calming-bg min-h-screen pb-32">
-      <header className="flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-40 py-4 -mx-8 px-8">
+    <div className="p-4 sm:p-8 space-y-6 sm:space-y-10 bg-calming-bg min-h-screen pb-32">
+      <header className="flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-40 py-4 -mx-4 sm:-mx-8 px-4 sm:px-8">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Trung tâm Phân tích</h1>
-          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Video Modeling & Can thiệp</p>
+          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">Trung tâm Phân tích</h1>
+          <p className="text-[9px] sm:text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-0.5">Video Modeling & Can thiệp</p>
         </div>
         {/* Removing Upload Modeling Button as requested */}
       </header>
@@ -137,7 +137,7 @@ export default function TeacherHub() {
                     </p>
                   </div>
 
-                  <div className="text-right space-y-3 flex flex-col items-end">
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center w-full sm:w-auto text-right space-y-0 sm:space-y-3 pt-2 sm:pt-0 border-t sm:border-0 border-gray-50">
                     <div className="flex gap-2">
                       {canDelete && (
                         <button 

@@ -239,18 +239,18 @@ export default function ParentHome() {
   return (
     <div className="flex flex-col bg-[#F8FAFC] min-h-screen pb-32">
       {/* Header */}
-      <header className="px-6 py-6 flex justify-between items-center bg-white border-b border-slate-100 sticky top-0 z-40">
+      <header className="px-4 sm:px-6 py-4 sm:py-6 flex justify-between items-center bg-white border-b border-slate-100 sticky top-0 z-40">
         <div className="flex items-center gap-3">
           <UserMenu userName={userProfile?.displayName || "Phụ huynh"} role="parent" />
         </div>
-        <h1 className="text-lg font-bold text-slate-800">Trang chủ Phụ huynh</h1>
-        <div className="relative w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
-          <Bell size={20} />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
+        <h1 className="text-base sm:text-lg font-bold text-slate-800">Trang chủ Phụ huynh</h1>
+        <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
+          <Bell size={18} sm:size={20} />
+          <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
         </div>
       </header>
 
-      <main className="px-6 pt-8 space-y-10">
+      <main className="px-4 sm:px-6 pt-6 sm:pt-8 space-y-8 sm:space-y-10">
         {/* Profile */}
         <section className="flex items-center gap-5">
           <div className="relative">
@@ -264,12 +264,12 @@ export default function ParentHome() {
             <div className="absolute bottom-1 right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-white shadow-sm" />
           </div>
           <div className="flex-1">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Chào ba mẹ!</h2>
-            <p className="text-slate-500 font-medium text-lg mt-0.5">
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Chào ba mẹ!</h2>
+            <p className="text-slate-500 font-medium text-base sm:text-lg mt-0.5">
               {userProfile?.childName || "Bé"} đang cảm thấy{" "}
               <span className="text-indigo-600 font-bold">{userProfile?.regulationLevel || "ổn định"}</span>
             </p>
-            <p className="text-orange-500 font-bold text-sm mt-1 uppercase tracking-wider">{today}</p>
+            <p className="text-orange-500 font-bold text-[10px] sm:text-sm mt-1 uppercase tracking-wider">{today}</p>
           </div>
           <div className="hidden sm:flex flex-col items-end gap-1">
             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tiến độ HPDT</span>
@@ -290,8 +290,8 @@ export default function ParentHome() {
             </div>
           </div>
           <div className="relative z-10 text-right">
-            <div className="text-5xl font-black text-indigo-600 leading-none tracking-tighter">
-              {userProfile?.hpdt || 75}<span className="text-2xl opacity-50">%</span>
+            <div className="text-4xl sm:text-5xl font-black text-indigo-600 leading-none tracking-tighter">
+              {userProfile?.hpdt || 75}<span className="text-xl sm:text-2xl opacity-50">%</span>
             </div>
             <div className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-2">
               <Zap size={10} fill="currentColor" /> +2.5% tuần này
@@ -324,7 +324,7 @@ export default function ParentHome() {
         </section>
 
         {/* AI Advice */}
-        <section className="bg-orange-50 rounded-[32px] p-8 space-y-6 relative overflow-hidden group">
+        <section className="bg-orange-50 rounded-[32px] p-6 sm:p-8 space-y-4 sm:space-y-6 relative overflow-hidden group">
           <div className="absolute -right-6 -top-6 w-32 h-32 bg-orange-100 rounded-full opacity-50 transition-transform group-hover:scale-110" />
           <div className="flex items-center gap-4 relative z-10">
             <div className="w-12 h-12 rounded-2xl bg-orange-500 text-white flex items-center justify-center shadow-lg shadow-orange-200">
@@ -518,7 +518,7 @@ export default function ParentHome() {
 
               return (
                 <motion.div key={exerciseId} layout className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
-                  <div onClick={() => toggleExpand(exerciseId)} className="p-8 cursor-pointer hover:bg-slate-50 transition-all">
+                  <div onClick={() => toggleExpand(exerciseId)} className="p-6 sm:p-8 cursor-pointer hover:bg-slate-50 transition-all">
                     <div className="flex items-start justify-between gap-6">
                       <div className="flex items-start gap-6 flex-1">
                         <div className="w-12 h-12 rounded-full bg-indigo-500 text-white flex items-center justify-center text-xl font-black shadow-lg shadow-indigo-100 shrink-0">
@@ -561,7 +561,7 @@ export default function ParentHome() {
                         exit={{ height: 0, opacity: 0 }}
                         className="border-t border-slate-50"
                       >
-                        <div className="p-8 bg-slate-50/50 space-y-8">
+                        <div className="p-6 sm:p-8 bg-slate-50/50 space-y-6 sm:space-y-8">
                           <div className="flex items-center gap-2 text-indigo-600">
                             <Sparkles size={16} />
                             <h5 className="text-xs font-black uppercase tracking-widest">Các bước thực hiện</h5>
