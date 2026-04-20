@@ -283,7 +283,17 @@ export default function VideoUploadModal({
         }
       }, 1500);
     } catch (error: unknown) {
-      const message = typeof error?.message === "string" ? error.message : "Không xác định";
+      let message = "Không xác định";
+      if (error instanceof Error && typeof error.message === "string") {
+        message = error.message;
+      } else if (
+        typeof error === "object" &&
+        error !== null &&
+        "message" in error &&
+        typeof (error as { message?: unknown }).message === "string"
+      ) {
+        message = (error as { message: string }).message;
+      }
       const messageLower = message.toLowerCase();
       if (message === "Upload canceled") {
         console.log("Upload canceled by user");
