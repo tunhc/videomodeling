@@ -324,11 +324,13 @@ export default function TeacherSchedule() {
             </div>
 
             <div className="space-y-6">
-              {latestAnalysis?.clinicalAnalysis?.interventions?.map((act: any, idx: number) => {
-                const exerciseId = act.title || `ex-${idx}`;
+              {latestAnalysis?.interventionPlan?.lessons?.map((lesson: any, idx: number) => {
+                const exerciseId = lesson.lessonId || lesson.title || `ex-${idx}`;
                 const isExpanded = expandedExercises.includes(exerciseId);
-                const steps = act.steps || [];
-                const completedCount = steps.filter((s: string) => completedTasks.includes(`${exerciseId}-${s}`)).length;
+                const steps: any[] = lesson.steps || [];
+                const completedCount = steps.filter((_: any, sIdx: number) => completedTasks.includes(`${exerciseId}-${sIdx}`)).length;
+                const typeLabel = (lesson.lessonType || lesson.vmType || "ABA").replace(/_/g, " ").toUpperCase();
+                const objective = lesson.rationale || lesson.steps?.[0]?.description || "";
 
                 return (
                   <motion.div key={exerciseId} layout className="bg-white rounded-[40px] shadow-soft border border-gray-50 overflow-hidden">
@@ -341,7 +343,7 @@ export default function TeacherSchedule() {
                           <div className="space-y-3 flex-1">
                             <div className="flex items-center justify-between">
                               <h4 className="text-xl font-black text-gray-900 leading-tight">
-                                {act.title}
+                                {lesson.title}
                               </h4>
                               <div className="flex items-center gap-2">
                                 <span className="text-gray-400 font-black text-sm">{completedCount}/{steps.length}</span>
@@ -350,15 +352,15 @@ export default function TeacherSchedule() {
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <span className="bg-indigo-50 text-indigo-600 text-[10px] font-black px-3 py-1 rounded-lg uppercase">
-                                {act.therapies?.join(", ") || "ABA/VB"}
+                                {typeLabel}
                               </span>
                               <span className="bg-orange-50 text-orange-600 text-[10px] font-black px-3 py-1 rounded-lg uppercase">
                                 Mục tiêu AI
                               </span>
                             </div>
-                            <p className="text-gray-500 font-medium leading-relaxed text-sm">
-                              {act.objective}
-                            </p>
+                            {objective && (
+                              <p className="text-gray-500 font-medium leading-relaxed text-sm">{objective}</p>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -378,8 +380,9 @@ export default function TeacherSchedule() {
                               <h5 className="text-[10px] font-black uppercase tracking-widest">Các bước thực hiện tại trường</h5>
                             </div>
                             <div className="space-y-8">
-                              {steps.map((step: string, sIdx: number) => {
-                                const stepId = `${exerciseId}-${step}`;
+                              {steps.map((step: any, sIdx: number) => {
+                                const stepLabel = step.title || step.description || String(step);
+                                const stepId = `${exerciseId}-${sIdx}`;
                                 const isStepDone = completedTasks.includes(stepId);
                                 const isSaving = savingStep === stepId;
                                 return (
@@ -396,11 +399,11 @@ export default function TeacherSchedule() {
                                     </button>
                                     <div className="space-y-2 flex-1">
                                       <h6 className={`text-lg font-bold leading-tight transition-colors ${isStepDone ? "text-gray-300 line-through" : "text-gray-900"}`}>
-                                        {step}
+                                        {stepLabel}
                                       </h6>
-                                      {!isStepDone && (
+                                      {!isStepDone && step.therapistAction && (
                                         <p className="text-[11px] font-bold text-indigo-500 leading-relaxed italic">
-                                          HD: Quan sát kỹ phản ứng của bé và ghi chú nếu có hành vi mới.
+                                          GV: {step.therapistAction}
                                         </p>
                                       )}
                                     </div>
@@ -415,8 +418,8 @@ export default function TeacherSchedule() {
                   </motion.div>
                 );
               })}
-              
-              {!latestAnalysis && (
+
+              {(!latestAnalysis || !latestAnalysis?.interventionPlan?.lessons?.length) && (
                 <div className="bg-white/50 border-2 border-dashed border-gray-200 rounded-[40px] p-16 text-center">
                   <Info className="mx-auto text-gray-300 mb-4" size={40} />
                   <p className="text-sm font-black text-gray-400 uppercase tracking-widest">Chưa có kế hoạch can thiệp từ AI</p>
@@ -607,7 +610,7 @@ export default function TeacherSchedule() {
         initialTopic={activeTopic}
         onSuccess={() => {
           // Find the activity to get its details for database
-          const clinicalAct = latestAnalysis?.clinicalAnalysis?.interventions?.find((i: any) => i.title === activeTopic);
+          const clinicalAct = latestAnalysis?.interventionPlan?.lessons?.find((i: any) => i.title === activeTopic);
           if (clinicalAct) {
             handleUploadSuccess(activeTopic, clinicalAct);
           } else {
