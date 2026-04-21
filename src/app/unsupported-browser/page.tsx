@@ -1,6 +1,20 @@
 import Link from "next/link";
 
-export default function UnsupportedBrowserPage() {
+function getSafeReturnPath(from: string | undefined): string {
+  if (!from) return "/";
+  if (!from.startsWith("/") || from.startsWith("//")) return "/";
+  return from;
+}
+
+export default async function UnsupportedBrowserPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ from?: string; source?: string }>;
+}) {
+  const resolvedParams = (await searchParams) || {};
+  const returnTo = getSafeReturnPath(resolvedParams.from);
+  const continueHref = `${returnTo}${returnTo.includes("?") ? "&" : "?"}compat=allow`;
+
   return (
     <main className="min-h-screen bg-calm-gray flex items-center justify-center p-6">
       <section className="w-full max-w-xl rounded-3xl border border-amber-200 bg-white p-8 shadow-soft space-y-5">
@@ -20,6 +34,7 @@ export default function UnsupportedBrowserPage() {
         <ul className="list-disc pl-5 text-sm text-gray-700 space-y-2">
           <li>Cập nhật iOS/Safari lên phiên bản mới nhất có thể.</li>
           <li>Thử mở trang trên thiết bị mới hơn (iOS 16.4+).</li>
+          <li>Nếu mở từ Zalo, ưu tiên chọn “Mở bằng Safari” trong menu của Zalo.</li>
           <li>Nếu vẫn cần thử tiếp trên máy này, bấm nút bên dưới.</li>
         </ul>
 
@@ -31,7 +46,7 @@ export default function UnsupportedBrowserPage() {
             Quay lại đăng nhập
           </Link>
           <Link
-            href="/?compat=allow"
+            href={continueHref}
             className="inline-flex items-center justify-center rounded-xl border border-gray-200 px-4 py-3 text-sm font-bold text-gray-700"
           >
             Vẫn thử tiếp trên thiết bị này

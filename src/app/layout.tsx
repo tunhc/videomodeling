@@ -23,10 +23,26 @@ const LEGACY_BROWSER_GUARD = `
   try {
     var path = window.location.pathname || "";
     var query = window.location.search || "";
-    if (path.indexOf("/unsupported-browser") === 0) return;
-    if (query.indexOf("compat=allow") !== -1) return;
-
+    var compatStorageKey = "ai4autism_compat_allow";
     var ua = navigator.userAgent || "";
+    var isZaloInApp = /zalo/i.test(ua);
+
+    var compatByQuery = query.indexOf("compat=allow") !== -1;
+    var compatByStorage = false;
+    try {
+      if (compatByQuery && window.localStorage) {
+        window.localStorage.setItem(compatStorageKey, "1");
+      }
+      compatByStorage = !!(window.localStorage && window.localStorage.getItem(compatStorageKey) === "1");
+    } catch (_storageErr) {
+      compatByStorage = false;
+    }
+
+    var compatAllowed = compatByQuery || compatByStorage;
+
+    if (path.indexOf("/unsupported-browser") === 0) return;
+    if (compatAllowed) return;
+
     var iosMatch = ua.match(/OS (\\d+)_/);
     var iosMajor = iosMatch ? parseInt(iosMatch[1], 10) : null;
 
@@ -40,7 +56,19 @@ const LEGACY_BROWSER_GUARD = `
       safariMajor !== null && (safariMajor < 16 || (safariMajor === 16 && safariMinor < 4));
 
     if (isAppleWebKit && (isOldIOS || isOldSafari)) {
-      var target = "/unsupported-browser?from=" + encodeURIComponent(path);
+      if (isZaloInApp) {
+        try {
+          if (window.localStorage) {
+            window.localStorage.setItem(compatStorageKey, "1");
+          }
+        } catch (_err) {
+          // Ignore localStorage failures and keep app running.
+        }
+        return;
+      }
+
+      var currentPath = path + query;
+      var target = "/unsupported-browser?from=" + encodeURIComponent(currentPath);
       window.location.replace(target);
     }
   } catch (error) {

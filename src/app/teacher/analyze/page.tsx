@@ -30,6 +30,19 @@ const HPDT_DOMAINS = [
   { key: "motor" as const, label: "Vận động", color: "bg-sky-500" },
 ];
 
+function createTimeoutSignal(ms: number): { signal: AbortSignal; cancel: () => void } {
+  if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    return { signal: AbortSignal.timeout(ms), cancel: () => {} };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), ms);
+  return {
+    signal: controller.signal,
+    cancel: () => window.clearTimeout(timeoutId),
+  };
+}
+
 function AnalyzeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,6 +66,7 @@ function AnalyzeContent() {
     if (!v?.id) return;
     setPhase("ai");
     setProgress(40);
+    const { signal, cancel } = createTimeoutSignal(300_000);
     try {
       const teacherId = typeof window !== "undefined" ? localStorage.getItem("userId") || "system" : "system";
       const res = await fetch("/api/analyze-video", {
@@ -66,7 +80,7 @@ function AnalyzeContent() {
           childState: v.childState || "bình thường",
           locationNote: v.location || v.context || "tại trường"
         }),
-        signal: AbortSignal.timeout(120_000),
+        signal,
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -86,6 +100,8 @@ function AnalyzeContent() {
       setProgress(100);
       setPhase("done");
       setIsAnalyzing(false);
+    } finally {
+      cancel();
     }
   }, [videoId]);
 

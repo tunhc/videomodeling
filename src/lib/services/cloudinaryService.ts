@@ -2,6 +2,7 @@
  * Cloudinary Service for client-side video uploads
  */
 type CloudinaryUploadApiResponse = {
+  done?: boolean;
   url?: string;
   public_id?: string;
   secure_url?: string;
@@ -183,10 +184,6 @@ export const cloudinaryService = {
       });
     };
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("upload_preset", uploadPreset);
-    
     // Format: Role_ChildID_Location_MMDDYYYY
     const now = new Date();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
@@ -200,9 +197,64 @@ export const cloudinaryService = {
     const locationSlug = metadata.location || "unspecified";
     const indexStr = metadata.index !== undefined ? `-${String(metadata.index).padStart(2, '0')}` : "";
 
-    formData.append("folder", `AI4Autism/${centerNameClean}/Children/${childIdClean}`);
-    formData.append("public_id", `${roleCapitalized}_${childIdClean}_${locationSlug}-${dateStr}${indexStr}`);
-    formData.append("tags", `${childIdClean},${centerNameClean},${roleCapitalized},vst-auto-upload`);
+    const buildFormData = (inputFile: Blob | File) => {
+      const payload = new FormData();
+      payload.append("file", inputFile);
+      payload.append("upload_preset", uploadPreset);
+      payload.append("folder", `AI4Autism/${centerNameClean}/Children/${childIdClean}`);
+      payload.append("public_id", `${roleCapitalized}_${childIdClean}_${locationSlug}-${dateStr}${indexStr}`);
+      payload.append("tags", `${childIdClean},${centerNameClean},${roleCapitalized},vst-auto-upload`);
+      return payload;
+    };
+
+    const extractPublicIdFromDeliveryUrl = (deliveryUrl: string) => {
+      const cleanUrl = deliveryUrl.split("?")[0];
+      const uploadMarker = "/upload/";
+      const markerIndex = cleanUrl.indexOf(uploadMarker);
+      if (markerIndex === -1) return "";
+
+      const afterUpload = cleanUrl.slice(markerIndex + uploadMarker.length);
+      const segments = afterUpload.split("/").filter(Boolean);
+      if (segments.length === 0) return "";
+
+      const versionIndex = segments.findIndex((segment) => /^v\d+$/.test(segment));
+      const pathSegments = versionIndex >= 0 ? segments.slice(versionIndex + 1) : segments;
+      if (pathSegments.length === 0) return "";
+
+      return pathSegments.join("/").replace(/\.[^./]+$/, "");
+    };
+
+    const toUploadResult = (response: CloudinaryUploadApiResponse | null) => {
+      if (!response) return null;
+
+      const secureUrl = typeof response.secure_url === "string" && response.secure_url
+        ? response.secure_url
+        : typeof response.url === "string" && response.url
+        ? response.url
+        : "";
+
+      const url = typeof response.url === "string" && response.url
+        ? response.url
+        : secureUrl;
+
+      let publicId = typeof response.public_id === "string" ? response.public_id : "";
+      if (!publicId && secureUrl) {
+        publicId = extractPublicIdFromDeliveryUrl(secureUrl);
+      }
+
+      if (!secureUrl || !publicId) {
+        return null;
+      }
+
+      return {
+        url,
+        publicId,
+        secureUrl,
+        duration: typeof response.duration === "number" ? response.duration : undefined,
+      };
+    };
+
+    const formData = buildFormData(file);
 
     const chunkSize = Math.floor(chunkSizeMb * 1024 * 1024);
     const totalSize = file.size;
@@ -226,23 +278,17 @@ export const cloudinaryService = {
         onProgress(100);
       }
 
-      const url = typeof response.url === "string" ? response.url : "";
-      const publicId = typeof response.public_id === "string" ? response.public_id : "";
-      const secureUrl = typeof response.secure_url === "string" ? response.secure_url : "";
-      if (!url || !publicId || !secureUrl) {
+      const uploadResult = toUploadResult(response);
+      if (!uploadResult) {
         throw new Error("Cloudinary upload failed: thiếu dữ liệu URL trả về");
       }
 
-      return {
-        url,
-        publicId,
-        secureUrl,
-        duration: typeof response.duration === "number" ? response.duration : undefined,
-      };
+      return uploadResult;
     }
     
     let start = 0;
     let lastResponse: CloudinaryUploadApiResponse | null = null;
+    let lastAssetResponse: CloudinaryUploadApiResponse | null = null;
     let chunkIndex = 0;
 
     while (start < totalSize) {
@@ -250,13 +296,7 @@ export const cloudinaryService = {
       const chunk = file.slice(start, end);
       chunkIndex += 1;
       
-      const chunkFormData = new FormData();
-      // Copy metadata once (usually only need preset for subsequent chunks, but safe to include)
-      chunkFormData.append("file", chunk);
-      chunkFormData.append("upload_preset", uploadPreset);
-      chunkFormData.append("folder", `AI4Autism/${centerNameClean}/Children/${childIdClean}`);
-      chunkFormData.append("public_id", `${roleCapitalized}_${childIdClean}_${locationSlug}-${dateStr}${indexStr}`);
-      chunkFormData.append("tags", `${childIdClean},${centerNameClean},${roleCapitalized},vst-auto-upload`);
+      const chunkFormData = buildFormData(chunk);
 
       const currentStart = start;
       const currentEnd = end;
@@ -273,6 +313,9 @@ export const cloudinaryService = {
       });
 
       lastResponse = result;
+      if (typeof result.secure_url === "string" || typeof result.url === "string") {
+        lastAssetResponse = result;
+      }
       start = end;
       
       if (onProgress) {
@@ -286,19 +329,28 @@ export const cloudinaryService = {
       onProgress(100);
     }
 
-    const url = typeof lastResponse.url === "string" ? lastResponse.url : "";
-    const publicId = typeof lastResponse.public_id === "string" ? lastResponse.public_id : "";
-    const secureUrl = typeof lastResponse.secure_url === "string" ? lastResponse.secure_url : "";
-    if (!url || !publicId || !secureUrl) {
-      throw new Error("Upload failed: thiếu dữ liệu URL từ chunk cuối");
+    let uploadResult = toUploadResult(lastAssetResponse ?? lastResponse);
+
+    if (!uploadResult) {
+      console.warn("[Cloudinary] Missing delivery URL from chunk flow, retrying once with single request fallback.");
+      const fallbackResponse = await executeWithRetry("Cloudinary fallback upload", async () => {
+        return sendUploadRequest({
+          payload: buildFormData(file),
+          startByte: 0,
+          endByte: Math.max(totalSize - 1, 0),
+          totalBytes: totalSize,
+          useChunkHeaders: false,
+          label: "Cloudinary fallback upload",
+        });
+      });
+      uploadResult = toUploadResult(fallbackResponse);
     }
 
-    return {
-      url,
-      publicId,
-      secureUrl,
-      duration: typeof lastResponse.duration === "number" ? lastResponse.duration : undefined,
-    };
+    if (!uploadResult) {
+      throw new Error("Upload failed: Cloudinary chưa trả về URL hợp lệ sau khi fallback");
+    }
+
+    return uploadResult;
   },
 
   /**
