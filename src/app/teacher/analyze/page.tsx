@@ -62,18 +62,61 @@ function AnalyzeContent() {
 
   const [analysisId, setAnalysisId] = useState<string | null>(null);
 
-  const runAnalysis = useCallback(async (v: any, dur: number) => {
-    if (!v?.id) return;
+  const runAnalysis = useCallback(async (v: any) => {
+    if (!videoId) {
+      setError("Không tìm thấy mã video để phân tích.");
+      setProgress(100);
+      setPhase("done");
+      setIsAnalyzing(false);
+      return;
+    }
+
+    if (!v?.childId) {
+      setError("Video chưa có thông tin trẻ (childId), không thể phân tích.");
+      setProgress(100);
+      setPhase("done");
+      setIsAnalyzing(false);
+      return;
+    }
+
+    const resolvedVideoId = v?.id || videoId;
     setPhase("ai");
-    setProgress(40);
+    setProgress((prev) => Math.max(prev, 40));
+    setError(null);
     const { signal, cancel } = createTimeoutSignal(300_000);
+    const aiProgressTimer = window.setInterval(() => {
+      setProgress((prev) => (prev < 92 ? prev + 2 : prev));
+    }, 1500);
+
     try {
+      // Nếu clip đã phân tích trước đó thì load luôn kết quả, không gọi AI lại.
+      const existingRes = await fetch(`/api/analyze-video?videoId=${encodeURIComponent(resolvedVideoId)}`, {
+        cache: "no-store",
+      });
+      if (existingRes.ok) {
+        const existing = await existingRes.json();
+        const existingFrame = (existing?.frameAnalysis ?? null) as VideoAnalysisResult | null;
+        if (existingFrame && typeof existingFrame === "object") {
+          setAnalysisId(existing.analysisId || existing.id || null);
+          setResult(existingFrame);
+          const existingNote =
+            typeof existing.diary_notes === "string" && existing.diary_notes.trim()
+              ? existing.diary_notes
+              : existingFrame.suggestedNote;
+          if (existingNote) setNote(existingNote);
+          setProgress(100);
+          setPhase("done");
+          setIsAnalyzing(false);
+          return;
+        }
+      }
+
       const teacherId = typeof window !== "undefined" ? localStorage.getItem("userId") || "system" : "system";
       const res = await fetch("/api/analyze-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          videoId: videoId,
+          videoId: resolvedVideoId,
           childId: v.childId,
           teacherId,
           senderRole: "teacher",
@@ -94,36 +137,88 @@ function AnalyzeContent() {
       setProgress(100);
       setPhase("done");
       setIsAnalyzing(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Analysis error:", err);
-      setError(err.message || "Phân tích AI gặp sự cố. Vui lòng thử lại.");
+      const message = err instanceof Error ? err.message : "Phân tích AI gặp sự cố. Vui lòng thử lại.";
+      setError(message);
       setProgress(100);
       setPhase("done");
       setIsAnalyzing(false);
     } finally {
+      window.clearInterval(aiProgressTimer);
       cancel();
     }
   }, [videoId]);
 
   useEffect(() => {
-    if (!videoId) return;
-    async function load() {
-      const data = await videoService.getVideoById(videoId!);
-      if (data) {
-        setVideo({ ...data, title: data.topic || "Video phân tích" });
-        setIsAnalyzing(true);
-        setProgress(5);
-        const t = setInterval(() => setProgress(p => { if (p >= 35) { clearInterval(t); return 35; } return p + 3; }), 150);
-        return () => clearInterval(t);
-      }
+    analysisStarted.current = false;
+    setVideo(null);
+    setResult(null);
+    setAnalysisId(null);
+    setError(null);
+    setNote("");
+    setSaved(false);
+    setSaving(false);
+  }, [videoId]);
+
+  useEffect(() => {
+    if (!videoId) {
+      setError("Không tìm thấy video. Vui lòng quay lại danh sách và thử lại.");
+      setIsAnalyzing(false);
+      setPhase("done");
+      return;
     }
-    load();
+
+    let active = true;
+    const progressTimer = window.setInterval(() => {
+      setProgress((p) => {
+        if (p >= 35) {
+          window.clearInterval(progressTimer);
+          return 35;
+        }
+        return p + 3;
+      });
+    }, 150);
+
+    setIsAnalyzing(true);
+    setPhase("scanning");
+    setProgress(5);
+
+    (async () => {
+      try {
+        const data = await videoService.getVideoById(videoId);
+        if (!active) return;
+        if (!data) {
+          throw new Error("Không tìm thấy video hoặc video đã bị xóa.");
+        }
+
+        setVideo({
+          ...data,
+          id: data.id || videoId,
+          title: data.topic || "Video phân tích",
+        });
+      } catch (err: unknown) {
+        if (!active) return;
+        const message = err instanceof Error ? err.message : "Không thể tải video để phân tích.";
+        setError(message);
+        setProgress(100);
+        setPhase("done");
+        setIsAnalyzing(false);
+      } finally {
+        window.clearInterval(progressTimer);
+      }
+    })();
+
+    return () => {
+      active = false;
+      window.clearInterval(progressTimer);
+    };
   }, [videoId]);
 
   useEffect(() => {
     if (video && !analysisStarted.current) {
       analysisStarted.current = true;
-      runAnalysis(video, video.duration || 0);
+      void runAnalysis(video);
     }
   }, [video, runAnalysis]);
 
