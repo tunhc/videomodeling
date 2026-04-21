@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   collection, getDocs, query, orderBy, doc,
   addDoc, serverTimestamp, deleteDoc,
@@ -179,6 +180,12 @@ const REGULATION_CONFIG: Record<string, { bg: string; text: string; label: strin
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function VideoListPage() {
+  const searchParams = useSearchParams();
+  const childIdParam = searchParams.get("childId") || "";
+  const startDateParam = searchParams.get("startDate") || "";
+  const endDateParam = searchParams.get("endDate") || "";
+  const locationParam = searchParams.get("location") || "";
+  const ageParam = searchParams.get("age") || "";
   const [videos, setVideos]       = useState<VideoItem[]>([]);
   const [children, setChildren]   = useState<Record<string, { name: string; birthday: string }>>({});
   const [loading, setLoading]     = useState(true);
@@ -223,6 +230,20 @@ export default function VideoListPage() {
   // Pagination
   const [pageSize, setPageSize]   = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    const childId = childIdParam.trim();
+    const start = startDateParam.trim();
+    const end = endDateParam.trim();
+    const location = locationParam.trim();
+    const age = ageParam.trim();
+
+    if (childId) setSearchChildId(childId);
+    if (start) setStartDate(start);
+    if (end) setEndDate(end);
+    if (location) setLocationFilter(location);
+    if (age) setAgeFilter(age);
+  }, [childIdParam, startDateParam, endDateParam, locationParam, ageParam]);
 
   // ── Data fetch ─────────────────────────────────────────────────────────────
   useEffect(() => {

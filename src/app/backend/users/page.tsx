@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, deleteDoc, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDoc, getDocs, deleteDoc, doc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
-  Users, UserPlus, Trash2, Search, Filter, Shield, 
-  Mail, Key, User, CheckCircle2, XCircle, AlertCircle, X
+  UserPlus, Trash2, Search, Shield,
+  Mail, Key, CheckCircle2, AlertCircle, X, RefreshCw, Power
 } from "lucide-react";
 
 interface UserItem {
@@ -14,7 +14,38 @@ interface UserItem {
   email: string;
   role: string;
   password?: string;
-  updatedAt?: any;
+  centerCode?: string;
+  childId?: string;
+  accountStatus: "active" | "inactive";
+  updatedAt?: unknown;
+}
+
+const ROLE_PREFIX: Record<string, string> = {
+  admin: "AD",
+  professor: "CG",
+  projectmanager: "PM",
+  teacher: "GV",
+  parent: "PH",
+};
+
+function randomToken(): string {
+  return Math.floor(100 + Math.random() * 900).toString();
+}
+
+function normalizeToken(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .replace(/[^A-Za-z0-9-]/g, "")
+    .toUpperCase();
+}
+
+function inferCenterFromId(id: string): string {
+  const parts = id.split("_");
+  if (parts.length >= 2) return parts[1] || "";
+  return "";
 }
 
 export default function UserManagementPage() {
@@ -22,15 +53,37 @@ export default function UserManagementPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [centerFilter, setCenterFilter] = useState("all");
 
   // Create User State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newUserId, setNewUserId] = useState("");
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState("teacher");
   const [newPassword, setNewPassword] = useState("");
+  const [newChildName, setNewChildName] = useState("");
+  const [newCenterCode, setNewCenterCode] = useState("KBC-HCM");
+  const [newGender, setNewGender] = useState<"B" | "G">("B");
+  const [newRandomToken, setNewRandomToken] = useState(randomToken());
+  const [newAccountStatus, setNewAccountStatus] = useState<"active" | "inactive">("active");
   const [formLoading, setFormLoading] = useState(false);
+
+  const generatedUserId = useMemo(() => {
+    const prefix = ROLE_PREFIX[newRole] || "US";
+    const center = normalizeToken(newCenterCode || "CENTER");
+    const child = normalizeToken(newChildName || "CHILD");
+    return `${prefix}_${center}_${child}-${newGender}${newRandomToken}`;
+  }, [newRole, newCenterCode, newChildName, newGender, newRandomToken]);
+
+  const centerOptions = useMemo(() => {
+    const options = new Set<string>();
+    users.forEach((user) => {
+      const center = user.centerCode || inferCenterFromId(user.id);
+      if (center) options.add(center);
+    });
+    return Array.from(options).sort();
+  }, [users]);
 
   useEffect(() => {
     fetchUsers();
@@ -49,6 +102,9 @@ export default function UserManagementPage() {
           email: data.email || "",
           role: data.role || "unknown",
           password: data.password || "",
+          centerCode: data.centerCode || data.centerId || inferCenterFromId(doc.id),
+          childId: data.childId || "",
+          accountStatus: data.accountStatus === "inactive" || data.active === false ? "inactive" : "active",
           updatedAt: data.updatedAt
         });
       });
@@ -72,31 +128,70 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleToggleStatus = async (user: UserItem) => {
+    const nextStatus = user.accountStatus === "active" ? "inactive" : "active";
+    try {
+      await updateDoc(doc(db, "users", user.id), {
+        accountStatus: nextStatus,
+        active: nextStatus === "active",
+        updatedAt: serverTimestamp(),
+      });
+
+      setUsers((prev) =>
+        prev.map((item) =>
+          item.id === user.id
+            ? { ...item, accountStatus: nextStatus, updatedAt: new Date() }
+            : item
+        )
+      );
+    } catch (err) {
+      console.error("Error updating user status:", err);
+      alert("Không thể cập nhật trạng thái tài khoản.");
+    }
+  };
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserId || !newName || !newEmail || !newPassword) {
+    if (!newName || !newEmail || !newPassword || !newChildName || !newCenterCode) {
       alert("Vui lòng nhập đầy đủ thông tin.");
       return;
     }
 
     setFormLoading(true);
     try {
+      const docRef = doc(db, "users", generatedUserId);
+      const existing = await getDoc(docRef);
+      if (existing.exists()) {
+        alert("ID tài khoản đã tồn tại. Vui lòng đổi child/gender hoặc random.");
+        setFormLoading(false);
+        return;
+      }
+
       const userData = {
-        displayName: newName,
-        email: newEmail,
+        displayName: newName.trim(),
+        email: newEmail.trim(),
         role: newRole,
         password: newPassword,
+        centerCode: normalizeToken(newCenterCode),
+        childAlias: normalizeToken(newChildName),
+        gender: newGender,
+        accountStatus: newAccountStatus,
+        active: newAccountStatus === "active",
         updatedAt: serverTimestamp()
       };
 
-      await setDoc(doc(db, "users", newUserId), userData);
+      await setDoc(docRef, userData);
       
       setIsModalOpen(false);
       // Reset form
-      setNewUserId("");
       setNewName("");
       setNewEmail("");
       setNewPassword("");
+      setNewChildName("");
+      setNewGender("B");
+      setNewCenterCode("KBC-HCM");
+      setNewRandomToken(randomToken());
+      setNewAccountStatus("active");
       
       fetchUsers(); // Refresh
     } catch (err) {
@@ -113,9 +208,12 @@ export default function UserManagementPage() {
                           u.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           u.email.toLowerCase().includes(searchQuery.toLowerCase());
       const matchRole = roleFilter === "all" || u.role === roleFilter;
-      return matchSearch && matchRole;
+      const matchStatus = statusFilter === "all" || u.accountStatus === statusFilter;
+      const userCenter = (u.centerCode || inferCenterFromId(u.id) || "").toLowerCase();
+      const matchCenter = centerFilter === "all" || userCenter === centerFilter.toLowerCase();
+      return matchSearch && matchRole && matchStatus && matchCenter;
     });
-  }, [users, searchQuery, roleFilter]);
+  }, [users, searchQuery, roleFilter, statusFilter, centerFilter]);
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-700">
@@ -176,6 +274,42 @@ export default function UserManagementPage() {
             Giáo viên
           </button>
         </div>
+
+        <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100">
+          <button
+            onClick={() => setStatusFilter("all")}
+            className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${statusFilter === 'all' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-400'}`}
+          >
+            Mọi trạng thái
+          </button>
+          <button
+            onClick={() => setStatusFilter("active")}
+            className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${statusFilter === 'active' ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-400'}`}
+          >
+            Active
+          </button>
+          <button
+            onClick={() => setStatusFilter("inactive")}
+            className={`px-4 py-2 text-xs font-black uppercase rounded-xl transition-all ${statusFilter === 'inactive' ? 'bg-white shadow-sm text-rose-600' : 'text-gray-400'}`}
+          >
+            Inactive
+          </button>
+        </div>
+
+        <div className="min-w-[190px]">
+          <select
+            value={centerFilter}
+            onChange={(e) => setCenterFilter(e.target.value)}
+            className="w-full h-12 bg-gray-50 border border-gray-100 rounded-2xl px-4 text-sm font-bold text-gray-700"
+          >
+            <option value="all">Tất cả CenterID</option>
+            {centerOptions.map((center) => (
+              <option key={center} value={center}>
+                {center}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Users Table */}
@@ -186,7 +320,9 @@ export default function UserManagementPage() {
               <tr className="bg-gray-50/50">
                 <th className="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Tài khoản (ID)</th>
                 <th className="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Vai trò</th>
+                 <th className="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">CenterID</th>
                 <th className="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Email / Liên hệ</th>
+                 <th className="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Trạng thái</th>
                 <th className="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Mật khẩu</th>
                 <th className="px-8 py-6 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 text-right">Thao tác</th>
               </tr>
@@ -195,7 +331,7 @@ export default function UserManagementPage() {
               {loading ? (
                  Array(5).fill(0).map((_, i) => (
                     <tr key={i} className="animate-pulse">
-                       <td colSpan={5} className="px-8 py-6"><div className="h-6 bg-gray-50 rounded-lg w-full" /></td>
+                      <td colSpan={7} className="px-8 py-6"><div className="h-6 bg-gray-50 rounded-lg w-full" /></td>
                     </tr>
                  ))
               ) : filteredUsers.length > 0 ? (
@@ -223,31 +359,57 @@ export default function UserManagementPage() {
                       </span>
                     </td>
                     <td className="px-8 py-6">
+                      <span className="text-sm font-bold text-gray-700">{user.centerCode || inferCenterFromId(user.id) || "—"}</span>
+                    </td>
+                    <td className="px-8 py-6">
                       <div className="flex items-center gap-2 text-gray-500 font-medium text-sm">
                         <Mail className="w-4 h-4 text-gray-300" />
                         {user.email || "—"}
                       </div>
                     </td>
                     <td className="px-8 py-6">
+                      <button
+                        onClick={() => handleToggleStatus(user)}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wide border transition-colors ${
+                          user.accountStatus === "active"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                            : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                        }`}
+                        title="Bật/tắt trạng thái tài khoản"
+                      >
+                        <Power className="w-3 h-3" />
+                        {user.accountStatus}
+                      </button>
+                    </td>
+                    <td className="px-8 py-6">
                        <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
                           <Key className="w-3.5 h-3.5" />
-                          <span className="group-hover:text-gray-800 transition-colors">{user.password}</span>
+                          <span className="group-hover:text-gray-800 transition-colors">{user.password ? "•".repeat(Math.min(10, user.password.length)) : "—"}</span>
                        </div>
                     </td>
                     <td className="px-8 py-6 text-right">
-                       <button 
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                        title="Xóa tài khoản"
-                       >
-                          <Trash2 className="w-5 h-5" />
-                       </button>
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          onClick={() => handleToggleStatus(user)}
+                          className="p-2.5 text-gray-300 hover:text-amber-600 hover:bg-amber-50 rounded-xl transition-all"
+                          title="Đổi active/inactive"
+                        >
+                          <Power className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="p-2.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                          title="Xóa tài khoản"
+                        >
+                            <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                   <td colSpan={5} className="px-8 py-20 text-center">
+                   <td colSpan={7} className="px-8 py-20 text-center">
                       <div className="flex flex-col items-center gap-2">
                          <AlertCircle className="w-8 h-8 text-gray-200" />
                          <p className="text-gray-400 font-bold">Không tìm thấy tài khoản nào.</p>
@@ -272,30 +434,20 @@ export default function UserManagementPage() {
               
               <form onSubmit={handleCreateUser} className="p-8 space-y-6">
                  <div>
-                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">ID Tài khoản (Dùng để đăng nhập)</label>
-                    <input 
-                      type="text" 
-                      placeholder="VD: GV_KBC_AN" 
+                    <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Child Name</label>
+                    <input
+                      type="text"
+                      placeholder="VD: Khang"
                       className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
-                      value={newUserId}
-                      onChange={e => setNewUserId(e.target.value)}
+                      value={newChildName}
+                      onChange={e => setNewChildName(e.target.value)}
                       required
                     />
                  </div>
-                 <div className="grid grid-cols-2 gap-4">
+
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Họ và Tên</label>
-                        <input 
-                          type="text" 
-                          placeholder="Nguyễn Văn A" 
-                          className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
-                          value={newName}
-                          onChange={e => setNewName(e.target.value)}
-                          required
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Vai trò</label>
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Role</label>
                         <select 
                           className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 appearance-none"
                           value={newRole}
@@ -308,7 +460,72 @@ export default function UserManagementPage() {
                            <option value="parent">Phụ huynh</option>
                         </select>
                     </div>
+                    <div>
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">CenterID</label>
+                        <input
+                          type="text"
+                          placeholder="VD: KBC-HCM"
+                          className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
+                          value={newCenterCode}
+                          onChange={(e) => setNewCenterCode(e.target.value)}
+                          required
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Gender</label>
+                        <select
+                          className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 appearance-none"
+                          value={newGender}
+                          onChange={(e) => setNewGender(e.target.value as "B" | "G")}
+                        >
+                          <option value="B">B</option>
+                          <option value="G">G</option>
+                        </select>
+                    </div>
                  </div>
+
+                 <div className="rounded-2xl border border-gray-200 p-4 bg-gray-50">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Account ID tự sinh</p>
+                        <p className="text-sm font-black text-gray-800 mt-1 break-all">{generatedUserId}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNewRandomToken(randomToken())}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-xs font-black text-gray-600 hover:bg-white"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Random
+                      </button>
+                    </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Họ và tên</label>
+                      <input
+                        type="text"
+                        placeholder="Nguyễn Văn A"
+                        className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Trạng thái</label>
+                      <select
+                        value={newAccountStatus}
+                        onChange={(e) => setNewAccountStatus(e.target.value as "active" | "inactive")}
+                        className="w-full px-5 py-3.5 bg-gray-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-blue-500/20 appearance-none"
+                      >
+                        <option value="active">active</option>
+                        <option value="inactive">inactive</option>
+                      </select>
+                    </div>
+                 </div>
+
                  <div>
                     <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">Email</label>
                     <input 

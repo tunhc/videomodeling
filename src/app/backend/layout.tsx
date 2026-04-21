@@ -7,7 +7,7 @@ import { getAuthSession, clearAuthSession } from "@/lib/auth-session";
 import { doc, getDoc } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import Link from "next/link";
-import { LayoutDashboard, Users, Settings, LogOut, Menu, X, ShieldAlert, Video, Activity } from "lucide-react";
+import { LayoutDashboard, Users, Settings, LogOut, Menu, X, ShieldAlert, Video, Activity, ClipboardList } from "lucide-react";
 
 export default function BackendLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -21,6 +21,7 @@ export default function BackendLayout({ children }: { children: React.ReactNode 
     { name: "Tổng quan", href: "/backend", icon: <LayoutDashboard className="w-5 h-5" />, roles: ["admin", "professor", "projectmanager"] },
     { name: "Thống kê Video", href: "/backend/videos", icon: <Video className="w-5 h-5" />, roles: ["admin", "projectmanager", "professor"] },
     { name: "Danh sách Video", href: "/backend/videolist", icon: <Activity className="w-5 h-5" />, roles: ["admin", "professor", "projectmanager"] },
+    { name: "Ticket Logs", href: "/backend/tickets", icon: <ClipboardList className="w-5 h-5" />, roles: ["admin", "professor", "projectmanager"] },
     { name: "Người dùng", href: "/backend/users", icon: <Users className="w-5 h-5" />, roles: ["admin"] },
     { name: "Cài đặt", href: "/backend/settings", icon: <Settings className="w-5 h-5" />, roles: ["admin"] },
   ];
@@ -121,14 +122,14 @@ export default function BackendLayout({ children }: { children: React.ReactNode 
       `}>
         {/* Sidebar Header */}
         <div className="flex items-center justify-between h-20 px-6 bg-[#0b1121] border-b border-slate-800">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3">
             <div className="bg-gradient-to-br from-blue-500 to-emerald-400 p-2 rounded-xl shadow-lg shadow-blue-500/20">
               <ShieldAlert className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400">
               AI4Autism
             </span>
-          </div>
+          </Link>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-2 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors">
             <X className="w-5 h-5" />
           </button>

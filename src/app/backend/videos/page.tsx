@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Video, User, Users, Calendar, Filter, ChevronLeft, ArrowDown, ArrowUp, Search } from "lucide-react";
+import { Video, User, Users, Filter, ChevronLeft, ArrowDown, ArrowUp, Search } from "lucide-react";
 import Link from "next/link";
 
 interface VideoSummary {
@@ -15,6 +15,8 @@ interface VideoSummary {
   teachers: { id: string; name: string; count: number }[];
 }
 
+type SortKey = "childName" | "total" | "parentCount" | "teacher1" | "teacher2";
+
 export default function VideoSummaryPage() {
   const [data, setData] = useState<VideoSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +26,31 @@ export default function VideoSummaryPage() {
   const [endDate, setEndDate] = useState("");
   const [centerFilter, setCenterFilter] = useState("KBC");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("total");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [columnFilters, setColumnFilters] = useState({
+    child: "",
+    totalMin: "",
+    parentMin: "",
+    teacher1: "",
+    teacher2: "",
+  });
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection(key === "childName" ? "asc" : "desc");
+  };
+
+  const renderSortIcon = (key: SortKey) => {
+    if (sortKey !== key) return <ArrowDown className="w-3 h-3 text-gray-300" />;
+    return sortDirection === "asc"
+      ? <ArrowUp className="w-3 h-3 text-blue-500" />
+      : <ArrowDown className="w-3 h-3 text-blue-500" />;
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -112,14 +139,53 @@ export default function VideoSummaryPage() {
   }, [startDate, endDate]); // Refetch on date change for accuracy if many records
 
   const filteredData = useMemo(() => {
-    return data.filter(item => {
+    const minTotal = columnFilters.totalMin ? Number(columnFilters.totalMin) : null;
+    const minParent = columnFilters.parentMin ? Number(columnFilters.parentMin) : null;
+
+    const filtered = data.filter(item => {
       const matchCenter = item.centerId.toLowerCase().includes(centerFilter.toLowerCase()) || 
                           item.childId.toLowerCase().startsWith(centerFilter.toLowerCase());
       const matchSearch = item.childName.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           item.childId.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCenter && matchSearch;
-    }).sort((a, b) => b.total - a.total);
-  }, [data, centerFilter, searchQuery]);
+
+      const matchChildColumn =
+        columnFilters.child.trim() === "" ||
+        `${item.childName} ${item.childId}`.toLowerCase().includes(columnFilters.child.toLowerCase());
+
+      const matchTotal = minTotal === null || Number.isNaN(minTotal) ? true : item.total >= minTotal;
+      const matchParent = minParent === null || Number.isNaN(minParent) ? true : item.parentCount >= minParent;
+
+      const teacher1Name = item.teachers[0]?.name?.toLowerCase() || "";
+      const teacher2Name = item.teachers[1]?.name?.toLowerCase() || "";
+      const matchTeacher1 = columnFilters.teacher1.trim() === "" || teacher1Name.includes(columnFilters.teacher1.toLowerCase());
+      const matchTeacher2 = columnFilters.teacher2.trim() === "" || teacher2Name.includes(columnFilters.teacher2.toLowerCase());
+
+      return matchCenter && matchSearch && matchChildColumn && matchTotal && matchParent && matchTeacher1 && matchTeacher2;
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      const dir = sortDirection === "asc" ? 1 : -1;
+      if (sortKey === "childName") {
+        return a.childName.localeCompare(b.childName) * dir;
+      }
+      if (sortKey === "total") {
+        return (a.total - b.total) * dir;
+      }
+      if (sortKey === "parentCount") {
+        return (a.parentCount - b.parentCount) * dir;
+      }
+      if (sortKey === "teacher1") {
+        const aCount = a.teachers[0]?.count || 0;
+        const bCount = b.teachers[0]?.count || 0;
+        return (aCount - bCount) * dir;
+      }
+      const aCount = a.teachers[1]?.count || 0;
+      const bCount = b.teachers[1]?.count || 0;
+      return (aCount - bCount) * dir;
+    });
+
+    return sorted;
+  }, [data, centerFilter, searchQuery, columnFilters, sortKey, sortDirection]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -205,11 +271,82 @@ export default function VideoSummaryPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50/50">
-                <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Bé</th>
-                <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">Tổng video</th>
-                <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 text-center">PH Upload</th>
-                <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Giáo viên 1</th>
-                <th className="px-6 py-5 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Giáo viên 2</th>
+                <th className="px-6 py-4 border-b border-gray-100">
+                  <button onClick={() => handleSort("childName")} className="inline-flex items-center gap-1 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                    Bé
+                    {renderSortIcon("childName")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 border-b border-gray-100 text-center">
+                  <button onClick={() => handleSort("total")} className="inline-flex items-center gap-1 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                    Tổng video
+                    {renderSortIcon("total")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 border-b border-gray-100 text-center">
+                  <button onClick={() => handleSort("parentCount")} className="inline-flex items-center gap-1 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                    PH Upload
+                    {renderSortIcon("parentCount")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 border-b border-gray-100">
+                  <button onClick={() => handleSort("teacher1")} className="inline-flex items-center gap-1 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                    Giáo viên 1
+                    {renderSortIcon("teacher1")}
+                  </button>
+                </th>
+                <th className="px-6 py-4 border-b border-gray-100">
+                  <button onClick={() => handleSort("teacher2")} className="inline-flex items-center gap-1 text-[11px] font-black text-gray-500 uppercase tracking-widest">
+                    Giáo viên 2
+                    {renderSortIcon("teacher2")}
+                  </button>
+                </th>
+              </tr>
+              <tr className="bg-white">
+                <th className="px-6 py-3 border-b border-gray-100">
+                  <input
+                    value={columnFilters.child}
+                    onChange={(e) => setColumnFilters((prev) => ({ ...prev, child: e.target.value }))}
+                    placeholder="Lọc theo bé"
+                    className="w-full h-8 rounded-lg border border-gray-200 px-2 text-[11px] font-bold text-gray-700"
+                  />
+                </th>
+                <th className="px-6 py-3 border-b border-gray-100">
+                  <input
+                    type="number"
+                    min={0}
+                    value={columnFilters.totalMin}
+                    onChange={(e) => setColumnFilters((prev) => ({ ...prev, totalMin: e.target.value }))}
+                    placeholder="Min"
+                    className="w-full h-8 rounded-lg border border-gray-200 px-2 text-[11px] font-bold text-gray-700 text-center"
+                  />
+                </th>
+                <th className="px-6 py-3 border-b border-gray-100">
+                  <input
+                    type="number"
+                    min={0}
+                    value={columnFilters.parentMin}
+                    onChange={(e) => setColumnFilters((prev) => ({ ...prev, parentMin: e.target.value }))}
+                    placeholder="Min"
+                    className="w-full h-8 rounded-lg border border-gray-200 px-2 text-[11px] font-bold text-gray-700 text-center"
+                  />
+                </th>
+                <th className="px-6 py-3 border-b border-gray-100">
+                  <input
+                    value={columnFilters.teacher1}
+                    onChange={(e) => setColumnFilters((prev) => ({ ...prev, teacher1: e.target.value }))}
+                    placeholder="Lọc GV1"
+                    className="w-full h-8 rounded-lg border border-gray-200 px-2 text-[11px] font-bold text-gray-700"
+                  />
+                </th>
+                <th className="px-6 py-3 border-b border-gray-100">
+                  <input
+                    value={columnFilters.teacher2}
+                    onChange={(e) => setColumnFilters((prev) => ({ ...prev, teacher2: e.target.value }))}
+                    placeholder="Lọc GV2"
+                    className="w-full h-8 rounded-lg border border-gray-200 px-2 text-[11px] font-bold text-gray-700"
+                  />
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
