@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { Suspense, useEffect, useState, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   collection, getDocs, query, orderBy, doc,
@@ -179,7 +179,7 @@ const REGULATION_CONFIG: Record<string, { bg: string; text: string; label: strin
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
-export default function VideoListPage() {
+function VideoListPageContent() {
   const searchParams = useSearchParams();
   const childIdParam = searchParams.get("childId") || "";
   const startDateParam = searchParams.get("startDate") || "";
@@ -1337,5 +1337,19 @@ export default function VideoListPage() {
 
       <style dangerouslySetInnerHTML={{ __html: `.custom-scrollbar::-webkit-scrollbar{width:6px}.custom-scrollbar::-webkit-scrollbar-track{background:transparent}.custom-scrollbar::-webkit-scrollbar-thumb{background-color:rgba(156,163,175,0.3);border-radius:20px}` }} />
     </div>
+  );
+}
+
+export default function VideoListPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[45vh] flex items-center justify-center text-gray-400 font-semibold">
+          Đang tải danh sách video...
+        </div>
+      }
+    >
+      <VideoListPageContent />
+    </Suspense>
   );
 }
