@@ -7,7 +7,7 @@ import { getAuthSession, clearAuthSession } from "@/lib/auth-session";
 import { doc, getDoc } from "firebase/firestore";
 import { signInAnonymously } from "firebase/auth";
 import Link from "next/link";
-import { LayoutDashboard, Users, Settings, LogOut, Menu, X, ShieldAlert, Video, Activity, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Users, Settings, LogOut, Menu, X, ShieldAlert, Video, Activity, ClipboardList, Baby } from "lucide-react";
 
 export default function BackendLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -23,6 +23,7 @@ export default function BackendLayout({ children }: { children: React.ReactNode 
     { name: "Danh sách Video", href: "/backend/videolist", icon: <Activity className="w-5 h-5" />, roles: ["admin", "professor", "projectmanager"] },
     { name: "Ticket Logs", href: "/backend/tickets", icon: <ClipboardList className="w-5 h-5" />, roles: ["admin", "professor", "projectmanager"] },
     { name: "Người dùng", href: "/backend/users", icon: <Users className="w-5 h-5" />, roles: ["admin"] },
+    { name: "Em bé", href: "/backend/children", icon: <Baby className="w-5 h-5" />, roles: ["admin"] },
     { name: "Cài đặt", href: "/backend/settings", icon: <Settings className="w-5 h-5" />, roles: ["admin"] },
   ];
 
