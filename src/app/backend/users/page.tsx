@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { collection, getDoc, getDocs, deleteDoc, doc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
+import { arrayUnion, collection, getDoc, getDocs, deleteDoc, doc, setDoc, serverTimestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
   UserPlus, Trash2, Search, Shield,
-  Mail, Key, CheckCircle2, AlertCircle, X, RefreshCw, Power
+  Mail, Key, CheckCircle2, AlertCircle, X, RefreshCw, Power, Baby
 } from "lucide-react";
 
 interface UserItem {
@@ -32,6 +32,15 @@ function randomToken(): string {
   return Math.floor(100 + Math.random() * 900).toString();
 }
 
+function generatePassword(length = 8): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return out;
+}
+
 function normalizeToken(value: string): string {
   return value
     .normalize("NFD")
@@ -46,6 +55,48 @@ function inferCenterFromId(id: string): string {
   const parts = id.split("_");
   if (parts.length >= 2) return parts[1] || "";
   return "";
+}
+
+function parseDobDdMmYyyy(raw: string): string | null {
+  const trimmed = raw.trim();
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(trimmed);
+  if (!match) return null;
+
+  const dd = Number(match[1]);
+  const mm = Number(match[2]);
+  const yyyy = Number(match[3]);
+
+  if (yyyy < 2000 || yyyy > new Date().getFullYear()) return null;
+  if (mm < 1 || mm > 12) return null;
+  if (dd < 1 || dd > 31) return null;
+
+  const date = new Date(yyyy, mm - 1, dd);
+  if (
+    date.getFullYear() !== yyyy ||
+    date.getMonth() !== mm - 1 ||
+    date.getDate() !== dd
+  ) {
+    return null;
+  }
+
+  return `${yyyy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+}
+
+function deriveChildAlias(fullName: string): string {
+  const cleaned = normalizeToken(fullName)
+    .replace(/[^A-Z0-9\s]/g, " ")
+    .trim();
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "BE";
+
+  const last = parts[parts.length - 1].toLowerCase();
+  return last.charAt(0).toUpperCase() + last.slice(1);
+}
+
+function buildChildId(centerCode: string, childName: string, isoBirthday: string): string {
+  const yearSuffix = isoBirthday.slice(2, 4);
+  const alias = deriveChildAlias(childName);
+  return `${centerCode}_${alias}-G${yearSuffix}`;
 }
 
 export default function UserManagementPage() {
@@ -68,6 +119,13 @@ export default function UserManagementPage() {
   const [newRandomToken, setNewRandomToken] = useState(randomToken());
   const [newAccountStatus, setNewAccountStatus] = useState<"active" | "inactive">("active");
   const [formLoading, setFormLoading] = useState(false);
+
+  // Quick child-account creation (required DOB)
+  const [childTeacherId, setChildTeacherId] = useState("");
+  const [childFullName, setChildFullName] = useState("");
+  const [childDobInput, setChildDobInput] = useState("");
+  const [childCreateLoading, setChildCreateLoading] = useState(false);
+  const [childCreateMessage, setChildCreateMessage] = useState("");
 
   const generatedUserId = useMemo(() => {
     const prefix = ROLE_PREFIX[newRole] || "US";
@@ -202,6 +260,139 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleCreateChildAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChildCreateMessage("");
+
+    const teacherId = childTeacherId.trim().toUpperCase();
+    const childName = childFullName.trim();
+    const dobIso = parseDobDdMmYyyy(childDobInput);
+
+    if (!teacherId.startsWith("GV_")) {
+      setChildCreateMessage("ID GV không hợp lệ. Ví dụ: GV_KBC_KHIEM");
+      return;
+    }
+
+    if (!childName) {
+      setChildCreateMessage("Vui lòng nhập tên bé.");
+      return;
+    }
+
+    if (!dobIso) {
+      setChildCreateMessage("Ngày sinh bắt buộc theo định dạng dd/mm/yyyy.");
+      return;
+    }
+
+    setChildCreateLoading(true);
+    try {
+      const teacherRef = doc(db, "users", teacherId);
+      const teacherSnap = await getDoc(teacherRef);
+      if (!teacherSnap.exists()) {
+        setChildCreateMessage(`Không tìm thấy giáo viên ${teacherId}.`);
+        setChildCreateLoading(false);
+        return;
+      }
+
+      const teacherData = teacherSnap.data() as Record<string, unknown>;
+      const inferredCenter =
+        (typeof teacherData.centerCode === "string" && teacherData.centerCode.trim()) ||
+        inferCenterFromId(teacherId) ||
+        "KBC-HCM";
+      const centerCode = normalizeToken(inferredCenter);
+
+      const baseChildId = buildChildId(centerCode, childName, dobIso);
+      let childId = baseChildId;
+      let attempt = 1;
+      while (attempt <= 20) {
+        const exists = await getDoc(doc(db, "children", childId));
+        if (!exists.exists()) break;
+        childId = `${baseChildId}-${attempt}`;
+        attempt += 1;
+      }
+
+      const parentId = `PH_${childId}`;
+      const parentPassword = generatePassword(8);
+      const nickname = deriveChildAlias(childName);
+
+      await setDoc(
+        doc(db, "children", childId),
+        {
+          id: childId,
+          name: childName,
+          nickname,
+          birthday: dobIso,
+          birthDay: dobIso,
+          gender: "B",
+          status: "Bình thường",
+          hpdt: 60,
+          schoolCode: centerCode,
+          teacherId,
+          teacherIds: [teacherId],
+          parentId,
+          updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, "users", parentId),
+        {
+          displayName: `Phụ huynh ${childName}`,
+          role: "parent",
+          childId,
+          teacherId,
+          centerCode,
+          password: parentPassword,
+          accountStatus: "active",
+          active: true,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, "users", teacherId),
+        {
+          childIds: arrayUnion(childId),
+          centerCode,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      await setDoc(
+        doc(db, "hpdt_stats", childId),
+        {
+          childId,
+          overallScore: 60,
+          dimensions: {
+            communication: 60,
+            social: 60,
+            behavior: 60,
+            sensory: 60,
+            sensor: 0,
+          },
+          lastUpdate: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      setChildCreateMessage(
+        `Tạo bé thành công: ${childId} | Parent: ${parentId} | Pass PH: ${parentPassword}`
+      );
+      setChildTeacherId("");
+      setChildFullName("");
+      setChildDobInput("");
+      await fetchUsers();
+    } catch (error) {
+      console.error("Error creating child account:", error);
+      setChildCreateMessage("Tạo account bé thất bại. Vui lòng thử lại.");
+    } finally {
+      setChildCreateLoading(false);
+    }
+  };
+
   const filteredUsers = useMemo(() => {
     return users.filter(u => {
       const matchSearch = u.id.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -234,6 +425,65 @@ export default function UserManagementPage() {
           Tạo tài khoản mới
         </button>
       </div>
+
+      <form onSubmit={handleCreateChildAccount} className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 space-y-4">
+        <div className="flex items-center gap-2">
+          <Baby className="w-5 h-5 text-indigo-600" />
+          <h2 className="text-lg font-black text-gray-900">Tạo account bé</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <label className="space-y-1">
+            <span className="text-[11px] font-black uppercase tracking-wide text-gray-500">ID GV *</span>
+            <input
+              value={childTeacherId}
+              onChange={(e) => setChildTeacherId(e.target.value)}
+              placeholder="GV_KBC_KHIEM"
+              className="w-full h-12 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-700"
+              required
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-[11px] font-black uppercase tracking-wide text-gray-500">Tên bé *</span>
+            <input
+              value={childFullName}
+              onChange={(e) => setChildFullName(e.target.value)}
+              placeholder="Trương Thanh Lâm"
+              className="w-full h-12 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-700"
+              required
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-[11px] font-black uppercase tracking-wide text-gray-500">Ngày sinh bé (dd/mm/yyyy) *</span>
+            <input
+              value={childDobInput}
+              onChange={(e) => setChildDobInput(e.target.value)}
+              placeholder="14/10/2020"
+              className="w-full h-12 px-4 rounded-2xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-700"
+              required
+            />
+          </label>
+        </div>
+
+        <p className="text-xs font-semibold text-gray-500">
+          Ngày sinh là trường bắt buộc vì ảnh hưởng trực tiếp đến hồ sơ profile của bé.
+        </p>
+
+        {childCreateMessage ? (
+          <p className="text-xs font-black text-indigo-600">{childCreateMessage}</p>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={childCreateLoading}
+          className="h-11 px-5 rounded-2xl bg-indigo-600 text-white text-xs font-black uppercase tracking-wider hover:bg-indigo-700 disabled:opacity-60 inline-flex items-center gap-2"
+        >
+          {childCreateLoading ? "Đang tạo" : "Tạo account bé"}
+          {!childCreateLoading && <CheckCircle2 className="w-4 h-4" />}
+        </button>
+      </form>
 
       {/* Filters */}
       <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-gray-100 flex flex-wrap items-center gap-4">

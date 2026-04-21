@@ -3,8 +3,8 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { 
-  LayoutDashboard, Brain, MessageSquare, Library, User, 
-  Users, ClipboardList, BarChart3, Calendar, Activity
+  Brain, MessageSquare, Library, User,
+  Users, Activity
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -24,7 +24,7 @@ export default function BottomNav({ role }: { role: "parent" | "teacher" }) {
     { href: "/teacher/library", icon: Library, label: "Thư viện" },
     { href: "/teacher/hub", icon: Brain, label: "AI Phân tích", isMain: true },
     { href: "/teacher/instruction", icon: MessageSquare, label: "Lời nhắn" },
-    { href: "/teacher/schedule", icon: Calendar, label: "Lịch dạy" },
+    { href: "/teacher/profile", icon: User, label: "Hồ sơ" },
   ];
 
   const links = role === "parent" ? parentLinks : teacherLinks;

@@ -1,45 +1,289 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { User, Calendar, MapPin, Shield, Brain, Heart, ChevronRight, Settings, LogOut, Bell, FileText, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { Camera, Loader2, Save, Sparkles } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { getAuthSession } from "@/lib/auth-session";
 import { resolveLearnerForParent } from "@/lib/services/learnerService";
 
-export default function ProfilePage() {
-  const [childData, setChildData] = useState<any>(null);
+type ParentGender = "male" | "female" | "other";
+type ChildGender = "B" | "G";
+
+interface ParentFormState {
+  displayName: string;
+  birthday: string;
+  gender: ParentGender;
+  email: string;
+  phone: string;
+}
+
+interface ChildFormState {
+  name: string;
+  birthday: string;
+  nickname: string;
+  gender: ChildGender;
+  centerId: string;
+  notes: string;
+  hpdt: number;
+}
+
+const MAX_AVATAR_DATA_URL_LENGTH = 750000;
+
+function toInputDate(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+    }
+    return "";
+  }
+
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    const d = (value as { toDate?: () => Date }).toDate?.();
+    if (d && !Number.isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+  }
+
+  return "";
+}
+
+function toDisplayDate(value: string): string {
+  if (!value) return "Chưa cập nhật";
+  const [yyyy, mm, dd] = value.split("-");
+  if (!yyyy || !mm || !dd) return "Chưa cập nhật";
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function normalizeParentGender(value: unknown): ParentGender {
+  const raw = String(value || "").toLowerCase();
+  if (raw === "male" || raw === "m" || raw === "nam" || raw === "b") return "male";
+  if (raw === "female" || raw === "f" || raw === "nu" || raw === "nữ" || raw === "g") return "female";
+  return "other";
+}
+
+function normalizeChildGender(value: unknown): ChildGender {
+  const raw = String(value || "").toUpperCase();
+  return raw === "G" ? "G" : "B";
+}
+
+async function compressAvatar(file: File): Promise<string> {
+  const sourceDataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Không đọc được file ảnh."));
+      }
+    };
+    reader.onerror = () => reject(new Error("Không đọc được file ảnh."));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("Ảnh không hợp lệ."));
+    img.src = sourceDataUrl;
+  });
+
+  const maxSide = 320;
+  const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Trình duyệt không hỗ trợ xử lý ảnh.");
+  }
+
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+export default function ParentProfilePage() {
   const [loading, setLoading] = useState(true);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const [userId, setUserId] = useState("");
+  const [childId, setChildId] = useState("");
+  const [avatarDataUrl, setAvatarDataUrl] = useState("");
+
+  const [parentForm, setParentForm] = useState<ParentFormState>({
+    displayName: "",
+    birthday: "",
+    gender: "other",
+    email: "",
+    phone: "",
+  });
+
+  const [childForm, setChildForm] = useState<ChildFormState>({
+    name: "",
+    birthday: "",
+    nickname: "",
+    gender: "B",
+    centerId: "",
+    notes: "",
+    hpdt: 0,
+  });
 
   useEffect(() => {
-    const userId = localStorage.getItem("userId");
-    if (!userId) {
-      setLoading(false);
-      return;
-    }
-
     async function loadProfile() {
       try {
-        const userSnap = await getDoc(doc(db, "users", userId as string));
-        if (userSnap.exists()) {
-          const userData = userSnap.data();
-          setUserProfile(userData);
+        const session = getAuthSession();
+        if (!session?.userId) {
+          setMessage("Không tìm thấy phiên đăng nhập.");
+          return;
+        }
 
-          const learner = await resolveLearnerForParent(userId as string, userData.childId);
-          if (learner) {
-            setChildData(learner);
+        setUserId(session.userId);
+
+        const userSnap = await getDoc(doc(db, "users", session.userId));
+        const userData = userSnap.exists() ? (userSnap.data() as Record<string, unknown>) : {};
+
+        setParentForm({
+          displayName: String(userData.displayName || userData.name || ""),
+          birthday: toInputDate(userData.birthday),
+          gender: normalizeParentGender(userData.gender),
+          email: String(userData.email || ""),
+          phone: String(userData.phone || ""),
+        });
+
+        const learner = await resolveLearnerForParent(
+          session.userId,
+          typeof userData.childId === "string" ? userData.childId : undefined
+        );
+
+        if (learner) {
+          const learnerData = learner as Record<string, unknown>;
+          setChildId(learner.id);
+          setChildForm({
+            name: String(learnerData.name || ""),
+            birthday: toInputDate(learnerData.birthday),
+            nickname: String(learnerData.nickname || ""),
+            gender: normalizeChildGender(learnerData.gender),
+            centerId: String(learnerData.schoolCode || userData.centerCode || ""),
+            notes: String(learnerData.notes || learnerData.description || ""),
+            hpdt: typeof learnerData.hpdt === "number" ? learnerData.hpdt : 0,
+          });
+
+          const existingAvatar = String(
+            learnerData.avatarDataUrl || learnerData.avatarUrl || userData.childAvatarDataUrl || ""
+          );
+          if (existingAvatar) {
+            setAvatarDataUrl(existingAvatar);
           }
         }
-      } catch (e) {
-        console.error("Error loading profile:", e);
+      } catch (error) {
+        console.error("[parent-profile] load error", error);
+        setMessage("Không tải được hồ sơ. Vui lòng thử lại.");
       } finally {
         setLoading(false);
       }
     }
 
-    loadProfile();
+    void loadProfile();
   }, []);
+
+  const hpdtLabel = useMemo(() => {
+    if (childForm.hpdt >= 70) return "Đang tiến bộ tốt";
+    if (childForm.hpdt >= 40) return "Đang cải thiện";
+    return "Cần thêm hỗ trợ";
+  }, [childForm.hpdt]);
+
+  const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setMessage("Vui lòng chọn file ảnh hợp lệ.");
+      return;
+    }
+
+    setAvatarUploading(true);
+    setMessage("");
+    try {
+      const compressed = await compressAvatar(file);
+      if (compressed.length > MAX_AVATAR_DATA_URL_LENGTH) {
+        throw new Error("Ảnh quá lớn sau khi nén, vui lòng chọn ảnh khác.");
+      }
+      setAvatarDataUrl(compressed);
+    } catch (error) {
+      const err = error instanceof Error ? error.message : "Không thể xử lý ảnh.";
+      setMessage(err);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!userId) {
+      setMessage("Không tìm thấy tài khoản đăng nhập.");
+      return;
+    }
+
+    if (!avatarDataUrl) {
+      setMessage("Vui lòng cập nhật avatar của bé trước khi lưu.");
+      return;
+    }
+
+    if (!parentForm.displayName.trim() || !parentForm.email.trim()) {
+      setMessage("Vui lòng nhập đầy đủ tên phụ huynh và email.");
+      return;
+    }
+
+    if (!childId || !childForm.name.trim() || !childForm.birthday || !childForm.centerId.trim()) {
+      setMessage("Vui lòng nhập đầy đủ tên bé, ngày sinh và centerID.");
+      return;
+    }
+
+    setSaving(true);
+    setMessage("");
+
+    try {
+      const userPayload: Record<string, unknown> = {
+        displayName: parentForm.displayName.trim(),
+        email: parentForm.email.trim(),
+        birthday: parentForm.birthday,
+        gender: parentForm.gender,
+        phone: parentForm.phone.trim(),
+        centerCode: childForm.centerId.trim(),
+        childId,
+        childAvatarDataUrl: avatarDataUrl,
+        updatedAt: serverTimestamp(),
+      };
+
+      await setDoc(doc(db, "users", userId), userPayload, { merge: true });
+
+      const childPayload: Record<string, unknown> = {
+        name: childForm.name.trim(),
+        birthday: childForm.birthday,
+        nickname: childForm.nickname.trim(),
+        gender: childForm.gender,
+        schoolCode: childForm.centerId.trim(),
+        notes: childForm.notes.trim(),
+        avatarDataUrl,
+        hpdt: childForm.hpdt,
+        updatedAt: serverTimestamp(),
+      };
+
+      await setDoc(doc(db, "children", childId), childPayload, { merge: true });
+      setMessage("Đã lưu thông tin phụ huynh và hồ sơ bé thành công.");
+    } catch (error) {
+      console.error("[parent-profile] save error", error);
+      setMessage("Lưu hồ sơ thất bại. Vui lòng thử lại.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -49,99 +293,188 @@ export default function ProfilePage() {
     );
   }
 
-  const sections = [
-    { label: "Báo cáo y tế & Hồ sơ gốc", icon: FileText, color: "text-blue-500", bg: "bg-blue-50" },
-    { label: "Lịch sử can thiệp", icon: Calendar, color: "text-purple-500", bg: "bg-purple-50" },
-    { label: "Cài đặt thông báo", icon: Bell, color: "text-orange-500", bg: "bg-orange-50" },
-    { label: "Quyền riêng tư & Bảo mật", icon: Shield, color: "text-emerald-500", bg: "bg-emerald-50" },
-  ];
-
   return (
-    <div className="p-8 space-y-10 bg-calming-bg min-h-screen pb-32">
-      <header className="bg-white/50 backdrop-blur-md sticky top-0 z-40 py-4 -mx-8 px-8 space-y-1">
-        <h1 className="text-2xl font-black text-gray-900 tracking-tight">Hồ sơ của bé</h1>
-        {childData && (
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Phụ huynh của {childData.name}</p>
-        )}
-      </header>
-
-      {/* Main Profile Card */}
-      <motion.div 
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-white rounded-[40px] p-10 shadow-premium border border-gray-50 space-y-8 relative overflow-hidden"
-      >
-        <div className="flex items-center gap-8">
-          <div className="relative">
-            <div className="w-24 h-24 bg-indigo-50 border-4 border-white rounded-[32px] flex items-center justify-center text-3xl font-black text-primary shadow-hpdt uppercase">
-              {childData?.name?.charAt(0) || "K"}
-            </div>
-            <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-500 border-4 border-white rounded-2xl flex items-center justify-center text-white">
-              <Shield size={18} />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-3xl font-black text-gray-900 tracking-tighter">{childData?.name || "Hồ sơ của bé"}</h2>
-            <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-gray-400">
-              <span>{childData?.id}</span>
-              <span className="text-gray-200">|</span>
-              <span>
-                {childData?.birthday ? `${new Date().getFullYear() - new Date(childData.birthday).getFullYear()} tuổi` : "Chưa cập nhật"}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 pt-4 border-t border-gray-50">
-          <div className="flex items-center gap-4">
-            <MapPin size={18} className="text-primary" />
-            <p className="text-sm font-bold text-gray-600">Kim Bình Center - TPHCM</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <Brain size={18} className="text-primary" />
-            <p className="text-sm font-bold text-gray-600">{childData?.diagnosis || "Đang cập nhật chẩn đoán"}</p>
-          </div>
-        </div>
-
-        {/* hpDT Progress Summary */}
-        <div className="bg-indigo-50/50 p-8 rounded-[32px] border border-white flex justify-between items-center">
-          <div className="space-y-1">
-            <p className="text-[10px] font-black text-primary uppercase tracking-widest leading-none">Tiến độ hpDT</p>
-            <p className="text-2xl font-black text-gray-900 tracking-tighter uppercase">
-              {childData?.hpdt >= 70 ? "Phát triển tốt" : childData?.hpdt >= 40 ? "Đang tiến triển" : "Cần hỗ trợ"}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-3xl font-black text-primary tracking-tighter">{childData?.hpdt || 0}%</p>
-            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Score mới nhất</p>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Menu Sections */}
-      <div className="space-y-4">
-        {sections.map((section, idx) => (
-          <motion.button 
-            key={idx}
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 0.2 + idx * 0.1 }}
-            className={`w-full bg-white border border-gray-50 p-6 rounded-[32px] flex items-center justify-between shadow-soft hover:shadow-premium transition-all group`}
-          >
-            <div className="flex items-center gap-5">
-              <div className={`w-12 h-12 ${section.bg} ${section.color} rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110`}>
-                <section.icon size={22} />
-              </div>
-              <span className="text-sm font-black text-gray-700 tracking-tight">{section.label}</span>
-            </div>
-            <ChevronRight size={20} className="text-gray-200 group-hover:text-primary transition-colors" />
-          </motion.button>
-        ))}
+    <div className="p-6 md:p-8 pb-28 bg-calming-bg min-h-screen space-y-6">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-black text-gray-900">Thông tin cá nhân</h1>
+        <p className="text-sm font-semibold text-gray-500 mt-1">Phụ huynh cập nhật hồ sơ và avatar của bé. Avatar được lưu trực tiếp trong cơ sở dữ liệu.</p>
       </div>
 
-      <button className="w-full py-6 flex items-center justify-center gap-3 text-red-400 font-extrabold text-xs uppercase tracking-[0.2em] opacity-50 hover:opacity-100 transition-opacity">
-        <LogOut size={18} /> Đăng xuất tài khoản
-      </button>
+      <div className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-soft space-y-6">
+        <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-wider text-primary">Avatar 3D + hpdt của trẻ</p>
+            <h2 className="text-xl font-black text-gray-900">{childForm.name || "Chưa có tên bé"}</h2>
+          </div>
+
+          <label className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-indigo-50 text-indigo-700 text-xs font-black uppercase tracking-wide cursor-pointer hover:bg-indigo-100">
+            <Camera className="w-4 h-4" />
+            {avatarUploading ? "Đang xử lý" : "Đổi avatar"}
+            <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+          </label>
+        </div>
+
+        <div className="relative rounded-[30px] bg-gradient-to-br from-indigo-600 via-blue-600 to-cyan-500 p-5 text-white shadow-lg">
+          <div className="absolute top-4 right-4 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/20 text-[10px] font-black uppercase">
+            <Sparkles className="w-3 h-3" />
+            hpdt {childForm.hpdt}%
+          </div>
+
+          <div className="w-32 h-32 rounded-[28px] overflow-hidden border-4 border-white/30 bg-white/15 shadow-xl backdrop-blur-sm">
+            {avatarDataUrl ? (
+              <Image src={avatarDataUrl} alt="Avatar bé" width={256} height={256} className="w-full h-full object-cover" unoptimized />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-4xl font-black">
+                {(childForm.name || "B").charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+
+          <div className="mt-4">
+            <p className="text-sm font-bold">{hpdtLabel}</p>
+            <p className="text-xs text-white/80 mt-1">Ngày sinh bé: {toDisplayDate(childForm.birthday)}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[32px] p-6 border border-gray-100 shadow-soft space-y-4">
+        <h3 className="text-lg font-black text-gray-900">Thông tin phụ huynh</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Tên phụ huynh</span>
+            <input
+              value={parentForm.displayName}
+              onChange={(e) => setParentForm((prev) => ({ ...prev, displayName: e.target.value }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+              placeholder="Nhập tên phụ huynh"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Ngày sinh</span>
+            <input
+              type="date"
+              value={parentForm.birthday}
+              onChange={(e) => setParentForm((prev) => ({ ...prev, birthday: e.target.value }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Giới tính</span>
+            <select
+              value={parentForm.gender}
+              onChange={(e) => setParentForm((prev) => ({ ...prev, gender: e.target.value as ParentGender }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+            >
+              <option value="male">Nam</option>
+              <option value="female">Nữ</option>
+              <option value="other">Khác</option>
+            </select>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Email</span>
+            <input
+              type="email"
+              value={parentForm.email}
+              onChange={(e) => setParentForm((prev) => ({ ...prev, email: e.target.value }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+              placeholder="example@email.com"
+            />
+          </label>
+
+          <label className="space-y-1 md:col-span-2">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Số điện thoại (optional)</span>
+            <input
+              value={parentForm.phone}
+              onChange={(e) => setParentForm((prev) => ({ ...prev, phone: e.target.value }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+              placeholder="Có thể để trống"
+            />
+          </label>
+        </div>
+
+        <div className="h-px bg-gray-100 my-2" />
+
+        <h3 className="text-lg font-black text-gray-900">Thông tin của bé</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Tên bé</span>
+            <input
+              value={childForm.name}
+              onChange={(e) => setChildForm((prev) => ({ ...prev, name: e.target.value }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+              placeholder="Tên bé"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Ngày sinh bé</span>
+            <input
+              type="date"
+              value={childForm.birthday}
+              onChange={(e) => setChildForm((prev) => ({ ...prev, birthday: e.target.value }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+            />
+            <p className="text-[11px] font-semibold text-gray-400">Hiển thị: {toDisplayDate(childForm.birthday)} (dd/mm/yyyy)</p>
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Biệt danh</span>
+            <input
+              value={childForm.nickname}
+              onChange={(e) => setChildForm((prev) => ({ ...prev, nickname: e.target.value }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+              placeholder="Biệt danh ở nhà"
+            />
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Giới tính bé</span>
+            <select
+              value={childForm.gender}
+              onChange={(e) => setChildForm((prev) => ({ ...prev, gender: e.target.value as ChildGender }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+            >
+              <option value="B">Bé trai (B)</option>
+              <option value="G">Bé gái (G)</option>
+            </select>
+          </label>
+
+          <label className="space-y-1 md:col-span-2">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Trung tâm can thiệp (centerID)</span>
+            <input
+              value={childForm.centerId}
+              onChange={(e) => setChildForm((prev) => ({ ...prev, centerId: e.target.value }))}
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-bold text-gray-700"
+              placeholder="Ví dụ: KBC-HCM"
+            />
+          </label>
+
+          <label className="space-y-1 md:col-span-2">
+            <span className="text-xs font-black uppercase tracking-wide text-gray-500">Ghi chú khác về bé</span>
+            <textarea
+              rows={4}
+              value={childForm.notes}
+              onChange={(e) => setChildForm((prev) => ({ ...prev, notes: e.target.value }))}
+              className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-sm font-medium text-gray-700"
+              placeholder="Ví dụ: sở thích, lưu ý cảm giác, thói quen cần theo dõi..."
+            />
+          </label>
+        </div>
+
+        {message ? <p className="text-sm font-bold text-indigo-600">{message}</p> : null}
+
+        <button
+          onClick={() => void saveProfile()}
+          disabled={saving || avatarUploading}
+          className="w-full h-12 rounded-2xl bg-primary text-white font-black uppercase tracking-widest text-xs disabled:opacity-60 inline-flex items-center justify-center gap-2"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {saving ? "Đang lưu" : "Lưu thông tin"}
+        </button>
+      </div>
     </div>
   );
 }

@@ -47,6 +47,21 @@ export default function UserMenu({ userName, role, avatarInitial }: UserMenuProp
     router.push("/login");
   };
 
+  const goToProfile = () => {
+    setIsOpen(false);
+    if (role === "teacher") {
+      router.push("/teacher/profile");
+      return;
+    }
+
+    if (role === "parent") {
+      router.push("/parent/profile");
+      return;
+    }
+
+    router.push("/backend/users");
+  };
+
   const openPasswordModal = () => {
     setIsOpen(false);
     setPasswordError("");
@@ -159,7 +174,7 @@ export default function UserMenu({ userName, role, avatarInitial }: UserMenuProp
 
               <div className="space-y-1">
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={goToProfile}
                   className="w-full flex items-center gap-3 px-6 py-4 text-sm font-bold text-gray-600 hover:text-primary hover:bg-primary/5 transition-colors group rounded-2xl"
                 >
                   <div className="p-2 rounded-xl bg-gray-50 group-hover:bg-primary/10 transition-colors text-gray-400 group-hover:text-primary">
