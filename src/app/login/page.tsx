@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Lock, User, Building2 } from "lucide-react";
 import { motion } from "framer-motion";
 import { getAuthSession, routeForRole, routeForSession, setAuthSession } from "@/lib/auth-session";
-import { loginWithUserIdPassword } from "@/lib/services/authService";
-import { auth } from "@/lib/firebase";
-import { signInAnonymously } from "firebase/auth";
+import { loginWithUserIdPassword, syncFirebaseAuth } from "@/lib/services/authService";
 
 export default function LoginPage() {
   const [center, setCenter] = useState("Kim Bình Center");
@@ -58,13 +56,7 @@ export default function LoginPage() {
         homePath: targetPath,
       });
 
-      // Sync with Firebase Auth to allow Storage uploads (Permission fix)
-      try {
-        await signInAnonymously(auth);
-      } catch (authErr) {
-        console.error("Firebase Auth Sync failed:", authErr);
-        // We continue anyway since custom login passed
-      }
+      await syncFirebaseAuth(authResult.userId);
 
       router.push(targetPath);
     } catch (error) {

@@ -20,11 +20,9 @@ function getGeminiKey(): string {
   return key;
 }
 
-function getBestModel(duration: number = 0): string {
-  if (duration > 0 && duration < 30) {
-    return "gemini-2.5-flash"; // short clips: fast + cheap
-  }
-  return "gemini-2.5-pro"; // long videos: deeper analysis
+function getBestModel(_duration: number = 0): string {
+  // Always use Flash — Pro has very low RPM quotas on prepaid plans
+  return "gemini-2.5-flash-preview-04-17";
 }
 
 function getGemini(model: string = "gemini-2.5-flash") {
@@ -37,8 +35,8 @@ async function geminiGenerate(
   preferredModel?: string
 ): Promise<string> {
   const models = preferredModel
-    ? [...new Set([preferredModel, "gemini-2.5-flash", "gemini-2.0-flash-lite-001"])]
-    : ["gemini-2.5-flash", "gemini-2.0-flash-lite-001"];
+    ? [...new Set([preferredModel, "gemini-2.5-flash-preview-04-17", "gemini-2.0-flash"])]
+    : ["gemini-2.5-flash-preview-04-17", "gemini-2.0-flash"];
 
   for (const modelName of models) {
     try {
@@ -515,11 +513,6 @@ Trả về JSON theo cấu trúc.`;
     const gMsg = geminiErr?.message || String(geminiErr);
     console.warn("[Phase1] Gemini failed:", gMsg);
     
-    // If Gemini hit quota, don't even try Claude (likely to fail or waste time)
-    if (gMsg.includes("429") || gMsg.includes("quota")) {
-      return buildFallbackResult(videoDuration, frameSeconds, "AI đang quá tải (Hết hạn mức). Vui lòng thử lại sau 1 phút.");
-    }
-
     try {
       const anthropic = getAnthropic();
       const response = await anthropic.messages.create({
@@ -651,10 +644,6 @@ export async function generateInterventionFromAnalysis(
     const gMsg = geminiErr?.message || String(geminiErr);
     console.warn("[Phase2] Gemini failed:", gMsg);
     
-    if (gMsg.includes("429") || gMsg.includes("quota")) {
-      return fallback;
-    }
-
     try {
       const raw = await callClaudeText(INTERVENTION_SYSTEM, userPrompt, 4000);
       return extractJson<FullVideoAnalysis>(raw);
@@ -767,10 +756,6 @@ Tạo báo cáo JSON với 4-5 bài tập đa liệu pháp:
     const gMsg = geminiErr?.message || String(geminiErr);
     console.warn("[Phase3] Gemini failed:", gMsg);
     
-    if (gMsg.includes("429") || gMsg.includes("quota")) {
-      return fallback;
-    }
-
     try {
       const raw = await callClaudeText(REPORT_SYSTEM, prompt, 5000);
       return extractJson<ReportContent>(raw);

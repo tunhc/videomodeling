@@ -17,7 +17,7 @@ import {
   Brain, Activity, Sparkles, ListChecks, Send,
   BookOpen, ChevronDown, ChevronUp, CheckSquare, Square,
   BarChart2, TrendingUp, ShieldCheck, ShieldAlert, FileDown,
-  ArrowUpDown,
+  ArrowUpDown, RotateCcw,
 } from "lucide-react";
 
 // ─── Interfaces ────────────────────────────────────────────────────────────
@@ -474,6 +474,34 @@ function VideoListPageContent() {
     }
   };
 
+  const handleReAnalyzeVideo = async (video: VideoItem) => {
+    setAnalyzingVideoId(video.id);
+    try {
+      const session = getAuthSession();
+      const res = await fetch("/api/analyze-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId: video.id, childId: video.childId, teacherId: session?.userId || "" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(`${err.error || "Phân tích thất bại"}${err.detail ? `\n\nChi tiết: ${err.detail}` : ""}`);
+      }
+      const data = (await res.json()) as AnalysisData;
+      setAnalysisData(data);
+      setAnalysisVideo(video);
+      setExpandedLesson(null);
+      setCheckedItems({});
+      if (data.analysisId) {
+        setAnalysisIdMap((prev) => ({ ...prev, [video.id]: data.analysisId }));
+      }
+    } catch (err: any) {
+      alert("Lỗi: " + (err?.message || "Vui lòng thử lại"));
+    } finally {
+      setAnalyzingVideoId(null);
+    }
+  };
+
   const handleConfirmAnalysis = async () => {
     if (!analysisData || !analysisVideo || isConfirming) return;
     
@@ -757,12 +785,16 @@ function VideoListPageContent() {
                       <FileDown className="w-4 h-4" />
                     </a>
                   )}
-                  <button
-                    onClick={() => openChildDetail(video.childId, video.childName)}
-                    className="p-2.5 bg-gray-50 text-gray-400 rounded-2xl hover:bg-gray-100 transition-all"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  {video.status === "Đã phân tích" && (
+                    <button
+                      onClick={() => handleReAnalyzeVideo(video)}
+                      disabled={analyzingVideoId === video.id}
+                      title="Chạy lại phân tích AI"
+                      className="p-2.5 bg-gray-50 text-gray-400 rounded-2xl hover:bg-indigo-50 hover:text-indigo-500 transition-all disabled:opacity-50"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

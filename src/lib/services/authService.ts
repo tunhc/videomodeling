@@ -9,8 +9,14 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInAnonymously,
+  signOut as firebaseSignOut,
+} from "firebase/auth";
 import type { AppUserRole } from "@/lib/auth-session";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import { getLearnersForTeacher } from "@/lib/services/learnerService";
 import { isAdminId } from "@/lib/constants";
 
@@ -223,4 +229,73 @@ export async function changeUserPassword(input: {
     password: input.nextPassword,
     updatedAt: serverTimestamp(),
   });
+}
+
+// ── Firebase Auth sync ──────────────────────────────────────────────────────
+
+function toFirebaseEmail(userId: string): string {
+  return `${userId.toLowerCase().replace(/[^a-z0-9]/g, "")}@ai4autism.internal`;
+}
+
+function generateInternalPassword(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$";
+  return Array.from({ length: 24 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+/**
+ * Signs the user into Firebase Auth using an internal email/password stored in
+ * Firestore. Creates the Firebase Auth account automatically on first login.
+ * This is separate from the app password so password-sync logic never conflicts.
+ */
+export async function syncFirebaseAuth(userId: string): Promise<void> {
+  try {
+    // Wait for Firebase Auth SDK to restore its persisted session from IndexedDB.
+    // auth.currentUser is null during this async restore and can't be trusted before this.
+    await auth.authStateReady();
+
+    // Already signed in — nothing to do
+    if (auth.currentUser) return;
+
+    const userRef = doc(db, "users", userId);
+    const snap = await getDoc(userRef);
+    const email = toFirebaseEmail(userId);
+    let fbPass: string = snap.exists() ? (snap.data().firebaseAuthPassword ?? "") : "";
+
+    if (!fbPass) {
+      fbPass = generateInternalPassword();
+      await updateDoc(userRef, { firebaseAuthPassword: fbPass });
+    }
+
+    try {
+      await signInWithEmailAndPassword(auth, email, fbPass);
+    } catch (err: any) {
+      const code: string = err?.code ?? "";
+      if (
+        code === "auth/user-not-found" ||
+        code === "auth/invalid-credential" ||
+        code === "auth/invalid-login-credentials"
+      ) {
+        await createUserWithEmailAndPassword(auth, email, fbPass);
+      } else if (code === "auth/wrong-password") {
+        const newPass = generateInternalPassword();
+        await updateDoc(userRef, { firebaseAuthPassword: newPass });
+        await createUserWithEmailAndPassword(auth, email, newPass).catch(() =>
+          signInAnonymously(auth)
+        );
+      } else {
+        console.warn("[syncFirebaseAuth] falling back to anonymous:", err?.message);
+        await signInAnonymously(auth);
+      }
+    }
+  } catch (outer) {
+    console.warn("[syncFirebaseAuth] skipped:", outer);
+  }
+}
+
+export async function signOutFirebase(): Promise<void> {
+  try {
+    await firebaseSignOut(auth);
+  } catch {
+    // best-effort
+  }
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import BottomNav from "@/components/layout/BottomNav";
 import { getAuthSession, routeForRole } from "@/lib/auth-session";
+import { syncFirebaseAuth } from "@/lib/services/authService";
 
 export default function TeacherLayout({
   children,
@@ -14,18 +15,23 @@ export default function TeacherLayout({
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const session = getAuthSession();
-    if (!session) {
-      router.replace("/login");
-      return;
-    }
+    async function init() {
+      const session = getAuthSession();
+      if (!session) {
+        router.replace("/login");
+        return;
+      }
 
-    if (session.userRole === "parent") {
-      router.replace(routeForRole(session.userRole));
-      return;
-    }
+      if (session.userRole === "parent") {
+        router.replace(routeForRole(session.userRole));
+        return;
+      }
 
-    setReady(true);
+      // Ensure Firebase Auth is active before pages query Firestore
+      await syncFirebaseAuth(session.userId);
+      setReady(true);
+    }
+    init();
   }, [router]);
 
   if (!ready) {

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { LogOut, User, Settings, ChevronDown, Lock, Loader2, X } from "lucide-react";
 import { clearAuthSession, getAuthSession } from "@/lib/auth-session";
-import { changeUserPassword } from "@/lib/services/authService";
+import { changeUserPassword, signOutFirebase } from "@/lib/services/authService";
 
 interface UserMenuProps {
   userName: string;
@@ -44,6 +44,7 @@ export default function UserMenu({ userName, role, avatarInitial }: UserMenuProp
 
   const handleLogout = () => {
     clearAuthSession();
+    signOutFirebase();
     router.push("/login");
   };
 

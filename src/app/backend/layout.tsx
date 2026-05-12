@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { auth, db } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { getAuthSession, clearAuthSession } from "@/lib/auth-session";
 import { doc, getDoc } from "firebase/firestore";
-import { signInAnonymously } from "firebase/auth";
+import { syncFirebaseAuth, signOutFirebase } from "@/lib/services/authService";
 import Link from "next/link";
 import { LayoutDashboard, Users, Settings, LogOut, Menu, X, ShieldAlert, Video, Activity, ClipboardList, Baby } from "lucide-react";
 
@@ -64,14 +64,7 @@ export default function BackendLayout({ children }: { children: React.ReactNode 
         const role = (data.role || session.userRole || "").toLowerCase();
         setActiveUserRole(role);
 
-        // Sync with Firebase Auth for Storage permissions
-        if (!auth.currentUser) {
-          try {
-            await signInAnonymously(auth);
-          } catch (syncErr) {
-            console.error("Layout Auth Sync error:", syncErr);
-          }
-        }
+        await syncFirebaseAuth(session.userId);
 
         // RBAC Access Guard
         if (!["admin", "professor", "projectmanager"].includes(role)) {
@@ -168,6 +161,7 @@ export default function BackendLayout({ children }: { children: React.ReactNode 
           <button 
             onClick={() => {
               clearAuthSession();
+              signOutFirebase();
               router.replace("/login");
             }}
             className="flex items-center gap-3 w-full px-4 py-3.5 text-slate-400 hover:bg-red-500 hover:text-white rounded-2xl transition-all duration-300 group"

@@ -177,10 +177,41 @@ export async function resolveLearnerForParent(parentId: string, preferredChildId
 
 export async function getLearnersForTeacher(teacherId: string, role: string) {
   const isAdmin = role === "admin";
+
+  // 1. Load learners assigned via child-side fields (primary/secondary teacher, etc.)
   const [fromChildren, fromStudents] = await Promise.all([
     getLearnersByTeacherInCollection("children", teacherId, isAdmin),
     getLearnersByTeacherInCollection("students", teacherId, isAdmin),
   ]);
 
-  return dedupeLearners([...fromChildren, ...fromStudents]);
+  const results = [...fromChildren, ...fromStudents];
+
+  // 2. Load learners assigned via teacher-side explicit childIds list (priority fallback)
+  if (!isAdmin) {
+    try {
+      const teacherDoc = await getDoc(doc(db, "users", teacherId));
+      if (teacherDoc.exists()) {
+        const data = teacherDoc.data();
+        const explicitChildIds = (data.childIds || data.ChildIDs || []) as string[];
+        
+        if (explicitChildIds.length > 0) {
+          const existingIds = new Set(results.map(r => r.id));
+          const missingIds = explicitChildIds.filter(id => !existingIds.has(id));
+          
+          if (missingIds.length > 0) {
+            const missingLearners = await Promise.all(
+              missingIds.map(id => getLearnerByIdAnyCollection(id))
+            );
+            for (const learner of missingLearners) {
+              if (learner) results.push(learner);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(`[LearnerService] Failed to load explicit childIds for teacher ${teacherId}`, error);
+    }
+  }
+
+  return dedupeLearners(results);
 }
